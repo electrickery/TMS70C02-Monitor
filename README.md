@@ -6,6 +6,24 @@ consisting of a CPU-memory board and a display/keyboard board. But for
 the first phase of development, a serial monitor is written, because
 the TMS70C02 has an internal serial port, and it is simpler.
 
+## Functionality
+
+Here the actual and planned (with * prefix) commands:
+
+        ** TMS70C02 Monitor Help Menu V0.2.0 **
+        *Caaaa - Call subroutine at aaaa
+         D[||+|-|[aaaa[-bbbb]]] - Dump memory from aaaa to bbbb
+         E[e] - View/set echo
+        *Faaaa eeee dd - Fill memory from aaaa to eeee with dd
+        *Gaaaa - jump to address aaaa
+        *Maaaa bb - Modify memory location
+         H - Help menu
+        *Raaaa eeee - RAM test from aaaa to eeee
+        *:ssaaaattdddddd....ddcc - receive Intel-hex record
+         * = not yet implemented
+
+
+
 ## Development environment
 
 The assembler is asl (AS V1.42 Beta [Bld 269]) from 

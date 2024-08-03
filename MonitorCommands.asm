@@ -55,18 +55,37 @@ _ND_1ADR
         MOV     CLBUF+1, B
         CALL    @CHRS2BIN
         MOV     A, ADDR1-1      ; MSB
-;        CALL    @OUTHEX
+
         MOV     CLBUF+2, A
         MOV     CLBUF+3, B
         CALL    @CHRS2BIN
         MOV     A, ADDR1       ; LSB
-;        CALL    @OUTHEX
+
         CALL    @DUMP256
         JMP     _ND_END
 
 _ND_2ADR
-        MOV     #"2", A
-        CALL    @OUTCHR
+        MOV     CLBUF,   A
+        MOV     CLBUF+1, B
+        CALL    @CHRS2BIN
+        MOV     A, ADDR1-1      ; MSB start
+
+        MOV     CLBUF+2, A
+        MOV     CLBUF+3, B
+        CALL    @CHRS2BIN
+        MOV     A, ADDR1       ; LSB start
+
+        MOV     CLBUF+5,   A
+        MOV     CLBUF+6, B
+        CALL    @CHRS2BIN
+        MOV     A, ADDR2-1      ; MSB end
+
+        MOV     CLBUF+7, A
+        MOV     CLBUF+8, B
+        CALL    @CHRS2BIN
+        MOV     A, ADDR2       ; LSB end
+        
+        CALL    @DUMPVAR
         JMP     _ND_END
 
 
@@ -82,13 +101,9 @@ CMD_ECHO
         CALL    @NEWLINE
         MOV     CLBUFP, B
         SUB     #CLBUF, B
-;        MOV     B, A
-;        CALL    @OUTHEX
-;        JZ      _CE_ERR
 
         CMP     #1, B
         JZ      _CE_1CHAR
-;        JMP     _CE_ERR
         
 _CE_ERR
         MOVD    #CEERMSG, MSGPTR
@@ -97,7 +112,6 @@ _CE_ERR
 
 _CE_1CHAR
         MOV     CLBUF,  A
-;        CALL    @OUTCHR
         CMP     #"?", A
         JZ      _CE_QUERY
         CMP     #"0", A
@@ -202,12 +216,39 @@ _DMP2561 CALL  DUMP16
         DEC   COUNT1
         JZ    _DMP256X
         CLRC
-;        ADC   #16, ADDR1
-;        JNC   _DMP2561
-;        INC   ADDR1-1
-        JMP   _DMP2561
-_DMP256X RETS        
 
+        JMP   _DMP2561
+_DMP256X RETS
+
+;;************************************************************************
+;; DUMPVAR
+;;
+;;************************************************************************
+DUMPVAR 
+        CMP     ADDR1-1, ADDR2-1   ; (ADDR2-1) - (ADDR1-1)
+        JPZ     _DVLOOP
+        JMP     _DVERR
+        
+_DVLOOP  ; while ADDR1 < ADDR2 call DUMP16
+        CALL    @DUMP16
+        CMP     ADDR1-1, ADDR2-1        ; ADDR1 will be updated by DUMP16...
+        JN      _DV_END
+        CMP     ADDR1, ADDR2
+        JN      _DV_END
+        CALL    @NEWLINE
+        JMP     _DVLOOP
+        
+_DVERR
+        MOVD    #DVERMSG, MSGPTR
+        CALL    @OUTSTR
+        JMP     _DV_END
+        
+_DV_END
+        RETS
+        
+DVERMSG
+        DB      " -- Incorrect format. Must be 'Dssss eeee' and ssss < eeee.", CR, LF, 0
+        
 ;;**********************************************************************
 ;; INHEXBF  Fast INHEXB  No echo no checking for esc or CR
 ;; Used for PC to Target communications like GETIHEX
@@ -329,7 +370,13 @@ INCA3X  RETS
 ;;**********************************************************************
 HELPMSG
         DB      CR, LF, "** TMS70C02 Monitor Help Menu V", VERSMYR, ".", VERSMIN, ".", VERSPAT, " **"
+        DB      CR, LF, "*Caaaa - Call subroutine at aaaa"
         DB      CR, LF, " D[||+|-|[aaaa[-bbbb]]] - Dump memory from aaaa to bbbb"
-        DB      CR, LF, " E[e] - view/set echo"
+        DB      CR, LF, " E[e] - View/set echo"
+        DB      CR, LF, "*Faaaa eeee dd - Fill memory from aaaa to eeee with dd"
+        DB      CR, LF, "*Gaaaa - jump to address aaaa"
+        DB      CR, LF, "*Maaaa bb - Modify memory location"
         DB      CR, LF, " H - Help menu"
-        DB      CR, LF, 0
+        DB      CR, LF, "*Raaaa eeee - RAM test from aaaa to eeee"
+        DB      CR, LF, "*:ssaaaattdddddd....ddcc - receive Intel-hex record"
+        DB      CR, LF, " * = not yet implemented", 0

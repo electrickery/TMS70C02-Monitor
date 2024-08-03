@@ -7,7 +7,7 @@
 
 
 VERSMYR EQU     "0"
-VERSMIN EQU     "1"
+VERSMIN EQU     "2"
 VERSPAT EQU     "0"
 
 ; Constants
