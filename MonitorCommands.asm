@@ -434,10 +434,67 @@ _FILDONE
         RETS
         
 FILER1MSG
-        DB      "Incorrect format. Should be: 'Fssss eeee dd'", CR, LF, 0
+        DB      " -- Incorrect format. Should be: 'Fssss eeee dd'", CR, LF, 0
 FILER2MSG
-        DB      "Incorrect address order. Should be: ssss < eeee", CR, LF, 0
+        DB      " -- Incorrect address order. Should be: ssss < eeee", CR, LF, 0
 
+;;**********************************************************************
+; Go command Jumps to ssss
+;;**********************************************************************
+CMD_GO
+        CALL    @COLLECT
+        JC      _CGABORT        ; check for carry = ESC pressed
+        MOV     CLBUFP, B       ; find command line length
+        SUB     #CLBUF, B       ; 
+        
+        CMP     #4, B          ; ssss
+        JNZ     _CG_ERR
+        
+        CALL    @NEWLINE   
+        CALL    @FIRSTADR
+        BR      *ADDR1          ; Ignoring the current CALL stack!
+        
+        JMP     _CGDONE         ; Won't be reached
+        
+_CG_ERR
+        MOVD    #GOERRMSG, MSGPTR
+        CALL    @OUTSTR
+_CGABORT
+_CGDONE
+        RETS
+
+GOERRMSG
+        DB      " -- Incorrect format. Should be: 'Gssss'", CR, LF, 0
+        
+;;**********************************************************************
+; Call command to to ssss
+;;**********************************************************************
+CMD_CALL        
+        CALL    @COLLECT
+        JC      _CCABORT        ; check for carry = ESC pressed
+        MOV     CLBUFP, B       ; find command line length
+        SUB     #CLBUF, B       ; 
+        
+        CMP     #4, B          ; ssss
+        JNZ     _CC_ERR
+        
+        CALL    @NEWLINE   
+        CALL    @FIRSTADR
+        CALL    *ADDR1          ; 
+        
+        JMP     _CCDONE         ; Won't be reached
+        
+_CC_ERR
+        MOVD    #CALERMSG, MSGPTR
+        CALL    @OUTSTR
+_CCABORT
+_CCDONE
+        RETS
+
+CALERMSG
+        DB      " -- Incorrect format. Should be: 'Cssss'", CR, LF, 0        
+        
+        
 ;;**********************************************************************
 ;; Messages
 ;;**********************************************************************
@@ -445,13 +502,16 @@ INITMSG
         DB      CR, LF, "** TMS70C02 Monitor Help Menu V", VERSMYR, ".", VERSMIN, ".", VERSPAT, " **", CR, LF, 0
 
 HELPMSG
-        DB      CR, LF, "*Caaaa - Call subroutine at aaaa"
+        DB      CR, LF, " Caaaa - Call subroutine at aaaa"
         DB      CR, LF, " D[||+|-|[aaaa[-bbbb]]] - Dump memory from aaaa to bbbb"
         DB      CR, LF, " E[e] - View/set echo"
         DB      CR, LF, " Faaaa eeee dd - Fill memory from aaaa to eeee with dd"
-        DB      CR, LF, "*Gaaaa - jump to address aaaa"
+        DB      CR, LF, " Gaaaa - jump to address aaaa"
         DB      CR, LF, " Maaaa bb - Modify memory location"
         DB      CR, LF, " H - Help menu"
         DB      CR, LF, "*Raaaa eeee - RAM test from aaaa to eeee"
         DB      CR, LF, "*:ssaaaattdddddd....ddcc - receive Intel-hex record"
         DB      CR, LF, " * = not yet implemented", 0
+
+
+

@@ -11,12 +11,12 @@ the TMS70C02 has an internal serial port, and it is simpler.
 Here the actual and planned (with * prefix) commands:
 
         ** TMS70C02 Monitor Help Menu V0.2.0 **
-        *Caaaa - Call subroutine at aaaa
+         Caaaa - Call subroutine at aaaa
          D[||+|-|[aaaa[-bbbb]]] - Dump memory from aaaa to bbbb
          E[e] - View/set echo
-        *Faaaa eeee dd - Fill memory from aaaa to eeee with dd
-        *Gaaaa - jump to address aaaa
-        *Maaaa bb - Modify memory location
+         Faaaa eeee dd - Fill memory from aaaa to eeee with dd
+         Gaaaa - jump to address aaaa
+         Maaaa bb - Modify memory location
          H - Help menu
         *Raaaa eeee - RAM test from aaaa to eeee
         *:ssaaaattdddddd....ddcc - receive Intel-hex record

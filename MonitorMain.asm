@@ -23,20 +23,21 @@ ESC     EQU     01Bh
 CREG    EQU     R2
 DREG    EQU     R3
 COUNT1  EQU     R4
-SYSFLGS EQU     R30     ; bit 0 = echo
-OUTBYTE EQU     R33
-INBYTE  EQU     R34
-MSGPTR  EQU     R38     ; H=37 L=38
-ADDR1   EQU     R40     ; H=39 L=40  source / start address
-ADDR2   EQU     R42     ; H=41 L=42  destination / end  address
-ADDR3   EQU     R44     ; H=43 L=44  iterating address pointer
-DATA    EQU     R45
+
+SYSFLGS EQU     R8     ; bit 0 = echo
+OUTBYTE EQU     R9
+INBYTE  EQU     R10
+MSGPTR  EQU     R12     ; H=11 L=12
+ADDR1   EQU     R14     ; H=13 L=14  source / start address
+ADDR2   EQU     R16     ; H=15 L=16  destination / end  address
+ADDR3   EQU     R18     ; H=17 L=18  iterating address pointer
+DATA    EQU     R19
 
 ; Note buffer must be placed within one page (MSB doesn't change)
-CLBUFPM EQU     R110    ; 006Eh   ; R110 pointer MSB
-CLBUFP  EQU     R111    ; 006Fh   ; R111 command line buffer pointer LSB
-CLBUF   EQU     R112    ; 0070h   ; R112 - R127   command line buffer
-CLBUFE  EQU     R127    ; 007Fh   ;  command line buffer end
+CLBUFPM EQU     R30    ; 001Eh   ; R110 pointer MSB
+CLBUFP  EQU     R31    ; 001Fh   ; R111 command line buffer pointer LSB
+CLBUF   EQU     R32    ; 0020h   ; R112 - R127   command line buffer
+CLBUFE  EQU     R74    ; 004Ah   ;  command line buffer end
 SP      EQU     0080h   ; R128 and up
 
 ; DBC board:
@@ -119,41 +120,46 @@ _LCONT
 MONCMDS
         CALL    @OUTCHR
         CALL    @TOUPPER
+        CMP     #'C', A
+        JNZ     _MC00
+        CALL    @CMD_CALL
+        JMP     _MC99
+_MC00        
         CMP     #'D', A
         JNZ     _MC01
         CALL    @CMD_DUMP
-        BR      _MC99
+        JMP     _MC99
 _MC01        
         CMP     #'E', A
         JNZ     _MC03
         CALL    @CMD_ECHO
-        BR      _MC99
+        JMP     _MC99
 _MC03        
         CMP     #'F', A
         JNZ     _MC05
         CALL    @CMD_FILL
-        BR      _MC99
+        JMP     _MC99
 _MC05        
         CMP     #'G', A
         JNZ     _MC07
-        CALL    @CMD_HELP
-        BR      _MC99
+        CALL    @CMD_GO
+        JMP     _MC99
 _MC07        
         CMP     #'H', A
         JNZ     _MC09
         CALL    @CMD_HELP
-        BR      _MC99
+        JMP     _MC99
 _MC09        
         CMP     #'?', A
-        JNZ     _MC11
+        JNZ     _MC13
         CALL    @CMD_HELP
-        BR      _MC99
-_MC11
+        JMP     _MC99
+_MC13
         CMP     #'M', A
-        JNZ     _MC12
+        JNZ     _MC15
         CALL    @CMD_MOD
-        BR      _MC99
-_MC12
+        JMP      _MC99
+_MC15
 
 
 _MC99
