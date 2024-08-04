@@ -165,7 +165,7 @@ _CMDONE
 MEMMOD  
         CALL    @FIRSTADR
         MOV     #5, B           ; index for 1st data char
-        CALL    @GETDATA2
+        CALL    @GETDATA
         MOV     #" ", A
         CALL    @OUTCHR
         MOV     DATA, A
@@ -329,23 +329,7 @@ OUTHEX  PUSH    B
         CALL    OUTNIBL     ; Print Low 4 Bits
         POP     B
         RETS
-
-;;**********************************************************************
-;; GETADDR  prompt for address and store in ADDR1  RP
-;;**********************************************************************
-GETADDR 
-;        MOV     #':', A
-;        CALL    @OUTCHR
        
-        CALL INHEXBF       ; Get 2 hex chars
-        MOV  A,     ADDR1-1 ; Store High Address
-        CALL INHEXBF       ; Get 2 hex chars
-        MOV  A,     ADDR1  ; Store Low Address
-_GETADDX RETS
-
-        MOV     ADDR3-1, A  ;
-        MOV     ADDR3, B    ;
-        
 ;;
 ;; CHRS2BIN - MSN-char in A, LSN-char in B. Returned value in A
 ;;
@@ -416,6 +400,7 @@ _CFABORT
 FILLER
         CALL    @FIRSTADR
         CALL    @SECONADR
+        MOV     #0Ah, B
         CALL    @GETDATA
         CMP     ADDR1-1, ADDR2-1        ; end must be greater than start
         JN      _FILERR
@@ -650,6 +635,72 @@ RT23ERMSG
 RT3ERMSG
         DB      " data not 0AAh error at ", 0
         
+;;**********************************************************************        
+;  CMD_HXINT - download Hex-Intel files. To be implemented.
+;;**********************************************************************
+CMD_HXINT
+        CALL    @COLLECT
+        CALL    @NEWLINE
+        
+        MOVD    #CLBUF, MSGPTR
+        CALL    @OUTSTR
+        RETS
+
+;;**********************************************************************        
+;  CMD_COPY Vssss eeee nnnn
+;;**********************************************************************
+CMD_COPY
+        CALL    @COLLECT
+        JC      _VP_ABORT        ; check for carry = ESC pressed
+        MOV     CLBUFP, B       ; find command line length
+        SUB     #CLBUF, B       ; 
+
+        CMP     #14, B           ; ssss eeee
+        JNZ     _VP_ERR
+        
+        CALL    @FIRSTADR
+        CALL    @SECONADR
+        CALL    @THIRDADR
+        
+        CMP     ADDR1-1, ADDR2-1        ; end must be greater than start
+        JN      _VP_ERR
+        
+        MOVD    ADDR1, ADDR3
+        
+        MOVD    ADDR1, R225
+        MOVD    ADDR2, R227
+        MOVD    ADDR3, R229
+        MOVD    ADDR4, R231
+
+_VP_LOOP
+        LDA     *ADDR3
+        STA     *ADDR4
+        INC     ADDR3
+        INC     ADDR4
+        JNC      _VP_NCS
+        INC     ADDR3-1
+_VP_NCS
+        JNC      _VP_NCD
+        INC     ADDR4-1
+_VP_NCD        
+        
+        CMP     ADDR2-1, ADDR3-1            ; LSB pointer check
+        JNZ      _VP_LOOP
+        CMP     ADDR2, ADDR3                ; MSB pointer loop
+        JNZ     _VP_LOOP
+
+        JMP     _VP_DONE
+    
+_VP_ERR
+        MOVD    #VPERMSG, MSGPTR
+        CALL    @OUTSTR
+
+_VP_ABORT
+_VP_DONE
+        RETS
+
+VPERMSG DB      " -- Incorrect format. Must be 'Vssss eeee nnnn' and ssss < eeee.", CR, LF, 0
+
 ;;**********************************************************************
 ;; Messages
 ;;**********************************************************************
@@ -658,13 +709,14 @@ INITMSG
 
 HELPMSG
         DB      CR, LF, " Caaaa - Call subroutine at aaaa"
-        DB      CR, LF, " D[||+|-|[aaaa[-bbbb]]] - Dump memory from aaaa to bbbb"
+        DB      CR, LF, " D[||+|-|aaaa[-bbbb]] - Dump memory from aaaa to bbbb"
         DB      CR, LF, " E[e] - View/set echo"
-        DB      CR, LF, " Faaaa eeee dd - Fill memory from aaaa to eeee with dd"
+        DB      CR, LF, " Faaaa eeee dd - Fill memory from aaaa to eeee-1 with dd"
         DB      CR, LF, " Gaaaa - jump to address aaaa"
         DB      CR, LF, " Maaaa bb - Modify memory location"
         DB      CR, LF, " H - Help menu"
-        DB      CR, LF, "*Raaaa eeee - RAM test from aaaa to eeee"
+        DB      CR, LF, " Raaaa eeee - RAM test from aaaa to eeee"
+        DB      CR, LF, " Vssss eeee nnnn - Copy memory range ssss to eeee to nnnn"
         DB      CR, LF, "*:ssaaaattdddddd....ddcc - receive Intel-hex record"
         DB      CR, LF, " * = not yet implemented", 0
 

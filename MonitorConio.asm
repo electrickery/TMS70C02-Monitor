@@ -80,6 +80,7 @@ _TPNOT
         
 ;;**********************************************************************
 ; FIRSTADR, SECONADR, GETDATA - interpret command line as 'ssss eeee dd'
+;  to be replaced by a generic routine, similar to GETDATA
 ;;**********************************************************************
 FIRSTADR        
         MOV     CLBUF,   A
@@ -104,18 +105,38 @@ SECONADR
         CALL    @CHRS2BIN
         MOV     A, ADDR2       ; LSB end
         RETS
-        
-GETDATA
-        MOV     CLBUF+0Ah, A
-        MOV     CLBUF+0Bh, B
+
+THIRDADR
+        MOV     #10, B          ; 10
+        LDA     CLBUF(B)
+        PUSH    A
+        INC     B
+        MOV     B, DREG
+        LDA     CLBUF(B)        ; 11
+        MOV     A, B
+        POP     A
         CALL    @CHRS2BIN
-        MOV     A, DATA
+        MOV     A, ADDR4-1
+        
+        MOV     DREG, B
+        INC     B
+        LDA     CLBUF(B)        ; 12
+        PUSH    A
+        INC     B
+        LDA     CLBUF(B)        ; 13
+        MOV     A, B
+        POP     A
+        CALL    @CHRS2BIN
+        MOV     A, ADDR4
+        
         RETS
+        
+
 
 ;;**********************************************************************
-; GETDATA2 - retrieve data from CLBUF, using B as index pointer
+; GETDATA - retrieve data from CLBUF, using B as index pointer
 ;;**********************************************************************
-GETDATA2                        ; 
+GETDATA                        ; 
         LDA     CLBUF(B)
         PUSH    A
         INC     B

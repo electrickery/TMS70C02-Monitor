@@ -26,18 +26,19 @@ COUNT1  EQU     R4
 
 SYSFLGS EQU     R8     ; bit 0 = echo
 OUTBYTE EQU     R9
-INBYTE  EQU     R10
+INBYTE  EQU     R10     ;
 MSGPTR  EQU     R12     ; H=11 L=12
-ADDR1   EQU     R14     ; H=13 L=14  source / start address
-ADDR2   EQU     R16     ; H=15 L=16  destination / end  address
-ADDR3   EQU     R18     ; H=17 L=18  iterating address pointer
-DATA    EQU     R19
+ADDR1   EQU     R14     ; H=13 L=14  source / start address     0Dh-0Eh
+ADDR2   EQU     R16     ; H=15 L=16  destination / end  address 0Fh-10h
+ADDR3   EQU     R18     ; H=17 L=18  iterating address pointer  11h-12h
+ADDR4   EQU     R20     ; H=19 L=20  iterating destination address 13h-14h  
+DATA    EQU     R21     ; 15h
 
 ; Note buffer must be placed within one page (MSB doesn't change)
 CLBUFPM EQU     R30    ; 001Eh   ; R110 pointer MSB
 CLBUFP  EQU     R31    ; 001Fh   ; R111 command line buffer pointer LSB
 CLBUF   EQU     R32    ; 0020h   ; R112 - R127   command line buffer
-CLBUFE  EQU     R74    ; 004Ah   ;  command line buffer end
+CLBUFE  EQU     R76    ; 004Ch   ;  command line buffer end
 SP      EQU     0080h   ; R128 and up
 
 ; DBC board:
@@ -165,7 +166,16 @@ _MC15
         CALL    @CMD_RAMT
         JMP      _MC99
 _MC17
-
+        CMP     #'V', A
+        JNZ     _MC17
+        CALL    @CMD_COPY
+        JMP      _MC99
+_MC19
+        CMP     #':', A
+        JNZ     _MC21
+        CALL    @CMD_HXINT
+        JMP      _MC99
+_MC21
 
 _MC99
         RETS
