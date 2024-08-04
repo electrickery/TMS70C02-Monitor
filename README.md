@@ -18,7 +18,7 @@ Here the actual and planned (with * prefix) commands:
          Gaaaa - jump to address aaaa
          Maaaa bb - Modify memory location
          H - Help menu
-        *Raaaa eeee - RAM test from aaaa to eeee
+         Raaaa eeee - RAM test from aaaa to eeee
         *:ssaaaattdddddd....ddcc - receive Intel-hex record
          * = not yet implemented
 

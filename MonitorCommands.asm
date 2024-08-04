@@ -17,15 +17,17 @@ NEWDUMP                 ; variants: no args     ; use previous address + 1, dump
                         ;           +           ; same as no args
                         ;           -           ; use previous address - 255, dump 256 bytes
         
+        MOV     CLBUFP, B       ; find command line length
+        SUB     #CLBUF, B       ; 
+        JZ      _ND_NOARG
+        
+        CMP     #1, B
+        JZ      _ND_1CHR
         CMP     #"+", CLBUF 
         JZ      _ND_PLUS
         
         CMP     #'-', CLBUF
         JZ      _ND_MIN
-        
-        MOV     CLBUFP, B       ; find command line length
-        SUB     #CLBUF, B       ; 
-        JZ      _ND_NOARG
         
         CMP     #4, B
         JZ      _ND_1ADR
@@ -33,6 +35,7 @@ NEWDUMP                 ; variants: no args     ; use previous address + 1, dump
         CMP     #9, B
         JZ      _ND_2ADR   
         
+_ND_ERR
         MOVD    #NDERMSG, MSGPTR
         CALL    @OUTSTR
         RETS
@@ -41,6 +44,14 @@ _ND_NOARG
 _ND_PLUS
         CALL    @DUMP256
         JMP     _ND_END
+        
+_ND_1CHR
+        CMP     #"+", CLBUF 
+        JZ      _ND_PLUS
+        
+        CMP     #'-', CLBUF
+        JZ      _ND_MIN
+        JMP     _ND_ERR
 
 _ND_MIN
         DEC     ADDR1-1
@@ -409,6 +420,7 @@ FILLER
         CMP     ADDR1-1, ADDR2-1        ; end must be greater than start
         JN      _FILERR
         
+FILRT
         MOVD    ADDR1, ADDR3
         MOV     DATA, A
 _FILLOOP
@@ -493,7 +505,150 @@ _CCDONE
 
 CALERMSG
         DB      " -- Incorrect format. Should be: 'Cssss'", CR, LF, 0        
+
+;;**********************************************************************
+; RAM test command from ssss to eeee
+;;**********************************************************************
+; - fill with 00h
+; - check for 00h
+; - for each location:
+;   - check for 00h
+;   - write 55h
+;   - check for 55h
+; - for each location:
+;   - check for 55h
+;   - write 0AAh
+;   - check for 0AAh
+; - fill with 0FFh
+; - check for 0FFh
+CMD_RAMT
+        CALL    @COLLECT
+        JC      _CRABORT        ; check for carry = ESC pressed
+        MOV     CLBUFP, B       ; find command line length
+        SUB     #CLBUF, B       ; 
+
+        CMP     #9, B           ; ssss eeee
+        JNZ     _CR_ERR
         
+        CALL    @NEWLINE   
+        CALL    @RAMTEST
+        
+        JMP     _CRDONE
+        
+_CR_ERR
+        MOVD    #RTER1MSG, MSGPTR
+        CALL    @OUTSTR
+_CRABORT
+_CRDONE
+        RETS
+        
+RAMTEST
+        CALL    @FIRSTADR
+        CALL    @SECONADR
+        MOVD    #RTSTRTMSG, MSGPTR
+        CALL    @OUTSTR
+        ; first phase, fill with 00h
+        MOV     #00h, DATA
+        CALL    @FILRT                  ; reuse bit of filler
+        MOVD    #RT1DONMSG, MSGPTR
+        CALL    @OUTSTR
+         
+        ; second phase
+        MOVD    ADDR1, ADDR3
+_RT2LOOP
+        CLR     A
+        CMPA    *ADDR3                  ; check each byte for initial 00h
+        JNZ     _RT2ER1
+        MOV     #055h, A
+        STA     *ADDR3                  ; change byte to 055h
+        CMPA    *ADDR3                  ; check new value
+        JNZ     _RT23ER2
+        INC     ADDR3
+        JNC     _RT2NC
+        INC     ADDR3
+_RT2NC
+        CMP     ADDR2-1, ADDR3-1        ; MSB pointer check
+        JZ      _RT2CHK
+        JMP     _RT2LOOP
+_RT2CHK        
+        CMP     ADDR2, ADDR3            ; LSB pointer check
+        JZ      _RT2DONE
+        JMP     _RT2LOOP
+_RT2DONE 
+        MOVD    #RT2DONMSG, MSGPTR
+        CALL    @OUTSTR
+       
+        ; third phase
+        MOVD    ADDR1, ADDR3
+_RT3LOOP
+        MOV     #055h, A
+        CMPA    *ADDR3                  ; check each byte for initial 00h
+        JNZ     _RT23ER2
+        MOV     #0AAh, A
+        STA     *ADDR3                  ; change byte to 055h
+        CMPA    *ADDR3                  ; check new value
+        JNZ     _RT23ER2
+        INC     ADDR3
+        JNC     _RT3NC
+        INC     ADDR3
+_RT3NC
+        CMP     ADDR2-1, ADDR3-1        ; MSB pointer check
+        JZ      _RT3CHK
+        JMP     _RT3LOOP
+_RT3CHK        
+        CMP     ADDR2, ADDR3            ; LSB pointer check
+        JZ      _RT3DONE
+        JMP     _RT3LOOP
+_RT3DONE
+        MOVD    #RT3DONMSG, MSGPTR
+        CALL    @OUTSTR
+        
+        ; fourth phase fill with 0FFh
+        MOV     #0FFh, DATA
+        CALL    @FILRT
+        MOVD    #RT4DONMSG, MSGPTR
+        CALL    @OUTSTR
+        
+_RTDONE        
+        RETS
+
+        
+_RT2ER1
+        MOVD    #RT2ERMSG, MSGPTR
+        CALL    @OUTSTR
+        MOV     ADDR3-1, A
+        CALL    @OUTHEX
+        MOV     ADDR3, A
+        CALL    @OUTHEX
+        JMP     _RTDONE
+        
+_RT23ER2        
+        MOVD    #RT23ERMSG, MSGPTR
+        CALL    @OUTSTR
+        MOV     ADDR3-1, A
+        CALL    @OUTHEX
+        MOV     ADDR3, A
+        CALL    @OUTHEX
+        JMP     _RTDONE
+        
+RTER1MSG
+        DB      " -- Incorrect format. Should be: 'Rssss eeee'", CR, LF, 0        
+RTSTRTMSG
+        DB      "Starting four phase RAM test.", CR, LF, 0
+RT1DONMSG
+        DB      "Phase 1, all 00h, done.", CR, LF, 0
+RT2DONMSG
+        DB      "Phase 2, 055h and check done.", CR, LF, 0
+RT3DONMSG
+        DB      "Phase 3, 0AAh and check done.", CR, LF, 0
+RT4DONMSG        
+        DB      "Phase 4, all 0FFh, done.", CR, LF, 0
+RT2ERMSG
+        DB      " data not 00h error at ", 0
+RT23ERMSG
+        DB      " data not 55h error at ", 0
+RT3ERMSG
+        DB      " data not 0AAh error at ", 0
         
 ;;**********************************************************************
 ;; Messages

@@ -160,6 +160,11 @@ _MC13
         CALL    @CMD_MOD
         JMP      _MC99
 _MC15
+        CMP     #'R', A
+        JNZ     _MC17
+        CALL    @CMD_RAMT
+        JMP      _MC99
+_MC17
 
 
 _MC99
