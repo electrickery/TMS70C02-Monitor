@@ -78,3 +78,51 @@ TOUPPER
 _TPNOT
         RETS
         
+;;**********************************************************************
+; FIRSTADR, SECONADR, GETDATA - interpret command line as 'ssss eeee dd'
+;;**********************************************************************
+FIRSTADR        
+        MOV     CLBUF,   A
+        MOV     CLBUF+1, B
+        CALL    @CHRS2BIN
+        MOV     A, ADDR1-1      ; MSB start
+
+        MOV     CLBUF+2, A
+        MOV     CLBUF+3, B
+        CALL    @CHRS2BIN
+        MOV     A, ADDR1       ; LSB start
+        RETS
+
+SECONADR
+        MOV     CLBUF+5,   A
+        MOV     CLBUF+6, B
+        CALL    @CHRS2BIN
+        MOV     A, ADDR2-1      ; MSB end
+
+        MOV     CLBUF+7, A
+        MOV     CLBUF+8, B
+        CALL    @CHRS2BIN
+        MOV     A, ADDR2       ; LSB end
+        RETS
+        
+GETDATA
+        MOV     CLBUF+0Ah, A
+        MOV     CLBUF+0Bh, B
+        CALL    @CHRS2BIN
+        MOV     A, DATA
+        RETS
+
+;;**********************************************************************
+; GETDATA2 - retrieve data from CLBUF, using B as index pointer
+;;**********************************************************************
+GETDATA2                        ; 
+        LDA     CLBUF(B)
+        PUSH    A
+        INC     B
+        LDA     CLBUF(B)
+        PUSH    A
+        POP     B
+        POP     A
+        CALL    @CHRS2BIN
+        MOV     A, DATA
+        RETS        

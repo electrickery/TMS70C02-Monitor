@@ -4,9 +4,11 @@
 ; ***** Dump
 CMD_DUMP
         CALL    @COLLECT
+        JC      _CDABORT        ; check for carry = ESC pressed
         CALL    @NEWLINE
         CALL    @NEWDUMP
-        
+_CDABORT
+
         RETS
         
 NEWDUMP                 ; variants: no args     ; use previous address + 1, dump 256 bytes
@@ -21,8 +23,8 @@ NEWDUMP                 ; variants: no args     ; use previous address + 1, dump
         CMP     #'-', CLBUF
         JZ      _ND_MIN
         
-        MOV     CLBUFP, B
-        SUB     #CLBUF, B
+        MOV     CLBUFP, B       ; find command line length
+        SUB     #CLBUF, B       ; 
         JZ      _ND_NOARG
         
         CMP     #4, B
@@ -51,39 +53,14 @@ _ND_NC
         JMP     _ND_END
 
 _ND_1ADR
-        MOV     CLBUF,   A
-        MOV     CLBUF+1, B
-        CALL    @CHRS2BIN
-        MOV     A, ADDR1-1      ; MSB
-
-        MOV     CLBUF+2, A
-        MOV     CLBUF+3, B
-        CALL    @CHRS2BIN
-        MOV     A, ADDR1       ; LSB
+        CALL    @FIRSTADR
 
         CALL    @DUMP256
         JMP     _ND_END
 
 _ND_2ADR
-        MOV     CLBUF,   A
-        MOV     CLBUF+1, B
-        CALL    @CHRS2BIN
-        MOV     A, ADDR1-1      ; MSB start
-
-        MOV     CLBUF+2, A
-        MOV     CLBUF+3, B
-        CALL    @CHRS2BIN
-        MOV     A, ADDR1       ; LSB start
-
-        MOV     CLBUF+5,   A
-        MOV     CLBUF+6, B
-        CALL    @CHRS2BIN
-        MOV     A, ADDR2-1      ; MSB end
-
-        MOV     CLBUF+7, A
-        MOV     CLBUF+8, B
-        CALL    @CHRS2BIN
-        MOV     A, ADDR2       ; LSB end
+        CALL    @FIRSTADR
+        CALL    @SECONADR
         
         CALL    @DUMPVAR
         JMP     _ND_END
@@ -98,9 +75,10 @@ NDERMSG
 ; ***** Read / modify echo mode        
 CMD_ECHO
         CALL    @COLLECT
+        JC      _CE_ABORT
         CALL    @NEWLINE
-        MOV     CLBUFP, B
-        SUB     #CLBUF, B
+        MOV     CLBUFP, B       ; find command line length
+        SUB     #CLBUF, B       ; 
 
         CMP     #1, B
         JZ      _CE_1CHAR
@@ -135,7 +113,8 @@ _CE_SET
         AND     #0FEh,  SYSFLGS
         OR      A, SYSFLGS
         JMP     _CE_QUERY
-        
+
+_CE_ABORT        
 _CE_END
         RETS
 
@@ -144,14 +123,47 @@ CEPFMSG DB      "Echo = ", 0
         
 ; ***** Help text
 CMD_HELP    
+        MOVD    #INITMSG, MSGPTR
+        CALL    @OUTSTR
         MOVD    #HELPMSG, MSGPTR
         CALL    @OUTSTR
         RETS
 
 ; ***** Modify memory
 CMD_MOD
-    
+        CALL    @COLLECT
+        JC      _CMABORT        ; check for carry = ESC pressed
+        
+        MOV     CLBUFP, B       ; find command line length
+        SUB     #CLBUF, B       ; 
+        
+        CMP     #7, B           ; aaaa dd
+        JNZ     _CMERR
+        
+        CALL    @NEWLINE
+        CALL    @MEMMOD
+        JMP     _CMDONE
+_CMERR
+        MOVD    #CMERMSG, MSGPTR
+        CALL    @OUTSTR  
+
+_CMABORT        
+_CMDONE
         RETS
+
+MEMMOD  
+        CALL    @FIRSTADR
+        MOV     #5, B           ; index for 1st data char
+        CALL    @GETDATA2
+        MOV     #" ", A
+        CALL    @OUTCHR
+        MOV     DATA, A
+;        CALL    @OUTHEX
+        STA     *ADDR1
+        RETS
+
+        
+CMERMSG DB      " -- Incorrect format. Should be: 'aaaa dd'--", CR, LF, 0
 
 ;;**********************************************************************
 ;; DUMP16                                                              
@@ -366,16 +378,79 @@ INCADD3 INC     ADDR3   ; next address LSB
 INCA3X  RETS
 
 ;;**********************************************************************
+;; FILL command - fills memory with constant
+;;**********************************************************************   
+CMD_FILL
+        CALL    @COLLECT
+        JC      _CFABORT        ; check for carry = ESC pressed
+        MOV     CLBUFP, B       ; find command line length
+        SUB     #CLBUF, B       ; 
+        
+        CMP     #12, B          ; ssss eeee dd
+        JNZ     _CF_ERR
+        
+        CALL    @NEWLINE
+        CALL    @FILLER
+        
+_CF_ERR        
+        MOV     CLBUFP, B       ; find command line length
+        SUB     #CLBUF, B       ; 
+
+_CFABORT
+        RETS
+
+;;**********************************************************************
+;; FILLER
+;;**********************************************************************
+FILLER
+        CALL    @FIRSTADR
+        CALL    @SECONADR
+        CALL    @GETDATA
+        CMP     ADDR1-1, ADDR2-1        ; end must be greater than start
+        JN      _FILERR
+        
+        MOVD    ADDR1, ADDR3
+        MOV     DATA, A
+_FILLOOP
+        STA     *ADDR3
+        INC     ADDR3
+        JNC     _FILNC
+        INC     ADDR3-1
+_FILNC
+        CMP     ADDR2-1, ADDR3-1        ; MSB pointer check
+        JZ      _FLCHK
+        JMP     _FILLOOP
+_FLCHK        
+        CMP     ADDR2, ADDR3            ; LSB pointer check
+        JZ      _FILDONE
+
+        JMP     _FILLOOP
+        
+_FILERR        
+        MOVD    #FILER2MSG, MSGPTR
+        CALL    @OUTSTR
+
+_FILDONE
+        RETS
+        
+FILER1MSG
+        DB      "Incorrect format. Should be: 'Fssss eeee dd'", CR, LF, 0
+FILER2MSG
+        DB      "Incorrect address order. Should be: ssss < eeee", CR, LF, 0
+
+;;**********************************************************************
 ;; Messages
 ;;**********************************************************************
+INITMSG
+        DB      CR, LF, "** TMS70C02 Monitor Help Menu V", VERSMYR, ".", VERSMIN, ".", VERSPAT, " **", CR, LF, 0
+
 HELPMSG
-        DB      CR, LF, "** TMS70C02 Monitor Help Menu V", VERSMYR, ".", VERSMIN, ".", VERSPAT, " **"
         DB      CR, LF, "*Caaaa - Call subroutine at aaaa"
         DB      CR, LF, " D[||+|-|[aaaa[-bbbb]]] - Dump memory from aaaa to bbbb"
         DB      CR, LF, " E[e] - View/set echo"
-        DB      CR, LF, "*Faaaa eeee dd - Fill memory from aaaa to eeee with dd"
+        DB      CR, LF, " Faaaa eeee dd - Fill memory from aaaa to eeee with dd"
         DB      CR, LF, "*Gaaaa - jump to address aaaa"
-        DB      CR, LF, "*Maaaa bb - Modify memory location"
+        DB      CR, LF, " Maaaa bb - Modify memory location"
         DB      CR, LF, " H - Help menu"
         DB      CR, LF, "*Raaaa eeee - RAM test from aaaa to eeee"
         DB      CR, LF, "*:ssaaaattdddddd....ddcc - receive Intel-hex record"

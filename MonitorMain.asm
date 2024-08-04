@@ -30,6 +30,7 @@ MSGPTR  EQU     R38     ; H=37 L=38
 ADDR1   EQU     R40     ; H=39 L=40  source / start address
 ADDR2   EQU     R42     ; H=41 L=42  destination / end  address
 ADDR3   EQU     R44     ; H=43 L=44  iterating address pointer
+DATA    EQU     R45
 
 ; Note buffer must be placed within one page (MSB doesn't change)
 CLBUFPM EQU     R110    ; 006Eh   ; R110 pointer MSB
@@ -84,7 +85,9 @@ START   MOV     #SP, B
 ;;**********************************************************************        
 ;; Main loop
 ;;**********************************************************************        
-        CALL    @CMD_HELP
+        MOVD    #INITMSG, MSGPTR
+        CALL    @OUTSTR
+
         CALL    @PROMPT
 _LOOP
         CALL    @WAIT4BYTE
@@ -115,47 +118,42 @@ _LCONT
        
 MONCMDS
         CALL    @OUTCHR
+        CALL    @TOUPPER
         CMP     #'D', A
         JNZ     _MC01
         CALL    @CMD_DUMP
         BR      _MC99
 _MC01        
-        CMP     #'d', A
-        JNZ     _MC02
-        CALL    @CMD_DUMP
-        BR      _MC99
-_MC02
         CMP     #'E', A
         JNZ     _MC03
         CALL    @CMD_ECHO
         BR      _MC99
 _MC03        
-        CMP     #'e', A
-        JNZ     _MC04
-        CALL    @CMD_ECHO
-        BR      _MC99
-_MC04        
-        CMP     #'H', A
+        CMP     #'F', A
         JNZ     _MC05
-        CALL    @CMD_HELP
+        CALL    @CMD_FILL
         BR      _MC99
 _MC05        
-        CMP     #'h', A
-        JNZ     _MC06
-        CALL    @CMD_HELP
-        BR      _MC99
-_MC06        
-        CMP     #'?', A
+        CMP     #'G', A
         JNZ     _MC07
         CALL    @CMD_HELP
         BR      _MC99
-_MC07
+_MC07        
+        CMP     #'H', A
+        JNZ     _MC09
+        CALL    @CMD_HELP
+        BR      _MC99
+_MC09        
+        CMP     #'?', A
+        JNZ     _MC11
+        CALL    @CMD_HELP
+        BR      _MC99
+_MC11
         CMP     #'M', A
-        JNZ     _MC08
-        CALL    @COLLECT
+        JNZ     _MC12
         CALL    @CMD_MOD
         BR      _MC99
-_MC08
+_MC12
 
 
 _MC99
@@ -183,6 +181,7 @@ _COLLESC                        ; ESC pressed
         MOV     #CLBUF, CLBUFP
         MOVD    #CLBESCMSG, MSGPTR
         CALL    @OUTSTR
+        SETC                   ; set carry flag to abort current command
         RETS
         
 _COLLERR                        ; buffer overflow
