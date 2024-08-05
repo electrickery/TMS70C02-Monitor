@@ -505,12 +505,12 @@ RAMTEST
         MOVD    #RTSTRTMSG, MSGPTR      ; "Starting four phase RAM test."
         CALL    @OUTSTR
         
-        CALL    @OUT1STAD
-        MOV     #" ", A
-        CALL    @OUTCHR
-        CALL    @OUT2NDAD
-        MOV     #" ", A
-        CALL    @OUTCHR
+;        CALL    @OUT1STAD
+;        MOV     #" ", A
+;        CALL    @OUTCHR
+;        CALL    @OUT2NDAD
+;        MOV     #" ", A
+;        CALL    @OUTCHR
         
         ; first phase, fill with 00h
         MOVD    ADDR1, ADDR3
@@ -582,7 +582,7 @@ _RT2DONE
         MOV     #"3", COUNT1
 _RT3LOOP
         MOV     #055h, A
-        CMPA    *ADDR3                  ; check each byte for initial 00h
+        CMPA    *ADDR3                  ; check each byte for initial 055h
         JNZ     _RT23ER2                ;  " data not 55h error at "
         MOV     #0AAh, A
         STA     *ADDR3                  ; change byte to 0AAh
@@ -599,9 +599,6 @@ _RT3CHK
         CMP     ADDR2, ADDR3            ; LSB pointer check
         JZ      _RT3DONE
         JMP     _RT3LOOP
-_RT3DONE
-        MOVD    #RT3DONMSG, MSGPTR
-        CALL    @OUTSTR
         
 _RT23ER2       ;  " data not 55h error at "
         MOV     COUNT1, A
@@ -616,30 +613,34 @@ _RT23ER2       ;  " data not 55h error at "
         CALL    @OUTHEX
         JMP     _RTDONE
         
+_RT3DONE
+        MOVD    #RT3DONMSG, MSGPTR
+        CALL    @OUTSTR
+        
         ; fourth phase fill with 0FFh
         MOVD    ADDR1, ADDR3
         MOV     #"4", COUNT1
 _RT4LOOP
         MOV     #0AAh, A
-        CMPA    *ADDR3                  ; check each byte for initial 00h
-        JNZ     _RT34ER1                ;  " data not 55h error at "
+        CMPA    *ADDR3                  ; check each byte for initial 0AAh
+        JNZ     _RT34ER1                ;  " data not AAh error at "
         MOV     #0FFh, A
-        STA     *ADDR3                  ; change byte to 055h
+        STA     *ADDR3                  ; change byte to 0FFh
         CMPA    *ADDR3                  ; check new value
-        JNZ     _RT4ER1                 ; " data not 0AAh error at "
+        JNZ     _RT4ER1                 ; " data not 0FFh error at "
         INC     ADDR3
         JNC     _RT4NC
         INC     ADDR3-1
 _RT4NC
         CMP     ADDR2-1, ADDR3-1        ; MSB pointer check
-        JZ      _RT3CHK
-        JMP     _RT3LOOP
+        JZ      _RT4CHK
+        JMP     _RT4LOOP
 _RT4CHK        
         CMP     ADDR2, ADDR3            ; LSB pointer check
-        JZ      _RT3DONE
-        JMP     _RT3LOOP
+        JZ      _RT4DONE
+        JMP     _RT4LOOP
 _RT4DONE
-        MOVD    #RT3DONMSG, MSGPTR
+        MOVD    #RT4DONMSG, MSGPTR
         CALL    @OUTSTR
                
 _RTDONE        
@@ -651,7 +652,7 @@ _RT34ER1       ;  " data not AAh error at "
         CALL    @OUTCHR
         MOV     #" ", A
         CALL    @OUTCHR
-        MOVD    #RT3ERMSG, MSGPTR
+        MOVD    #RT34ERMSG, MSGPTR
         CALL    @OUTSTR
         MOV     ADDR3-1, A
         CALL    @OUTHEX
@@ -684,7 +685,7 @@ RT2ERMSG
         DB      " data not 000h error at ", 0
 RT23ERMSG
         DB      " data not 055h error at ", 0
-RT3ERMSG
+RT34ERMSG
         DB      " data not 0AAh error at ", 0
 RT4ERMSG
         DB      " data not 0FFh error at ", 0
