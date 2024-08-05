@@ -39,8 +39,7 @@ side.
 The current hardware setup looks like this:
 ![TMS70C02 board with ROMemu 1.1](devEnv20240801.jpg)
 
-Since that photo the reset-relay feature was added to make download and
-restart automatic.
+
 
 ## Origin
 

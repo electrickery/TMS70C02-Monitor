@@ -166,6 +166,7 @@ MEMMOD
         CALL    @FIRSTADR
         MOV     #5, B           ; index for 1st data char
         CALL    @GETDATA
+        MOV     A, DATA
         MOV     #" ", A
         CALL    @OUTCHR
         MOV     DATA, A
@@ -191,17 +192,19 @@ DUMP16  MOVD    ADDR1, ADDR3    ; Move ADDR1 To Temp RP
         
         MOV     #16, B        ; Set Byte count
                             ; ** DUMP 16 Data Bytes in HEX ***
-_DUMP161 LDA    *ADDR3         ; Get Data byte
+_D16HLP ; Dump16 Hex Loop
+        LDA    *ADDR3         ; Get Data byte
         CALL    OUTHEX        ; Print as HEX
         MOV     #" ", A        
         DEC     B
         CMP     #8, B         ; On 8th byte print two spaces
-        JNZ     _DUMP162
+        JNZ     _D16HDN
         CALL    OUTCHR
-_DUMP162 CALL    OUTCHR
+_D16HDN  ; Dump16 Hex Loop Done
+        CALL    OUTCHR          ; Dump16 Hex loop Done
         CALL    INCADD3       ; Inc ADDR3
         TSTB                ; Done?
-        JNZ     _DUMP161       ; Do next byte
+        JNZ     _D16HLP       ; Do next byte
         
         CALL    OUTCHR        ; print 2 spaces
         CALL    OUTCHR
@@ -209,22 +212,20 @@ _DUMP162 CALL    OUTCHR
         MOV     #16, B        ; Set Byte count
         
                             ; ** DUMP 16 Data Bytes in ASCII ***
-_DUMP164 LDA    *ADDR3         ; Get Data byte
+_D16ALP   ; Dump16 ASCII Loop
+        LDA     *ADDR3         ; Get Data byte
         CMP     #" ", A       ; Less than blank? 
-        JPZ     _DUMP165
+        JPZ     _DUMP165        ; No dot
         MOV     #".", A
 _DUMP165 CMP    #07Fh, A      ; Greater than `~`  
-        JL      _DUMP166
+        JL      _DUMP166       ; No dot
         MOV     #".", A
-_DUMP166 CALL   OUTCHR        ; print it (or the .)
+_DUMP166 
+        CALL   OUTCHR        ; print it (or the .)
         CALL    @INCADD3       ; Inc ADDR3
         DEC     B
-;        TSTB                ; Done?
-        JNZ     _DUMP164       ; Do next byte
-;        MOV     #10, A
-;        CALL    OUTCHR        ; Print LF&CR then return
-;        MOV     #13, A
-;        CALL    OUTCHR
+        JNZ     _D16ALP       ; Do next byte
+        
 _DUMPEND
         MOVD    ADDR3, ADDR1    ; update address for next dump
         RETS
@@ -301,49 +302,17 @@ _INHEXF2 AND     #00Fh, A           ;Mask High nibble
         RETS
 
 ;;**********************************************************************
-;; OUTNIBH
-;; OUTPUT High 4 bits of A as 1 HEX Digit
-;; OUTNIBL
-;; OUTPUT Low 4 bits of A as 1 HEX Digit
-;;**********************************************************************
-OUTNIBH RR      A           ; OUT HEX LEFT HEX DIGIT
-        RR      A
-        RR      A
-        RR      A
-OUTNIBL AND     #00Fh, A    ; OUT HEX RIGHT HEX DIGIT
-        OR      #'0', A
-        CMPA    #':'
-        JL      OUTNIBX
-        ADD     #7, A
-OUTNIBX CALL    OUTCHR
-        RETS 
-     
-;;**********************************************************************
-;; OUTHEX
-;; Output A as 2 HEX digits
-;;**********************************************************************
-OUTHEX  PUSH    B
-        MOV     A, B        ; Save A in B 
-        CALL    OUTNIBH     ; Print High 4 bits
-        MOV     B, A        ; Get A from B 
-        CALL    OUTNIBL     ; Print Low 4 Bits
-        POP     B
-        RETS
-       
-;;
 ;; CHRS2BIN - MSN-char in A, LSN-char in B. Returned value in A
-;;
+;;**********************************************************************
 CHRS2BIN
-        PUSH    CREG
-        CALL    @CHR2NIB
+        CALL    @CHR2NIB        ; return value in A, lower nibble
         SWAP    A
         MOV     A, CREG
         MOV     B, A
         CALL    @CHR2NIB
         OR      CREG, A        ; Merge nibbles
-        POP     CREG
         RETS
-        
+
 ;;                     0-9      A-F      a-f
 ;;                   30h-39h, 41h-46h, 61h-66h
 ;; sub '0'            0h-9h,  11h-16h, 31h-36h
@@ -357,11 +326,7 @@ CHR2NIB
         CMP     #10h, A     ; is it A-F ?
         JN      _C2NOK
         SUB     #20h, A
-        
-;DEBUG  PUSH    B 
-;       STSP
-;       MOV     B, DREG
-;       POP B
+
 _C2NOK
         AND     #0Fh, A
         RETS
@@ -370,9 +335,9 @@ _C2NOK
 ;; INCADD3
 ;;**********************************************************************   
 INCADD3 INC     ADDR3   ; next address LSB
-        JNZ     INCA3X
+        JNZ     _INCA3X
         INC     ADDR3-1 ; next address MSB
-INCA3X  RETS
+_INCA3X  RETS
 
 ;;**********************************************************************
 ;; FILL command - fills memory with constant
@@ -389,13 +354,18 @@ CMD_FILL
         CALL    @NEWLINE
         CALL    @FILLER
         
+        JMP     _CFDONE
+        
 _CF_ERR        
         MOVD    #FILER1MSG, MSGPTR
         CALL    @OUTSTR
 
 _CFABORT
+_CFDONE
         RETS
         
+FILER1MSG
+        DB      " -- Incorrect format. Should be: 'Fssss eeee dd'", CR, LF, 0
 
 
 ;;**********************************************************************
@@ -406,23 +376,23 @@ FILLER
         CALL    @SECONADR
         MOV     #0Ah, B
         CALL    @GETDATA
+        MOV     A, DATA
         CMP     ADDR1-1, ADDR2-1        ; end must be greater than start
         JN      _FILERR
         
-FILRT
         MOVD    ADDR1, ADDR3
         MOV     DATA, A
 _FILLOOP
         STA     *ADDR3
-        INC     ADDR3
+        INC     ADDR3                   ; LSB
         JNC     _FILNC
-        INC     ADDR3-1
+        INC     ADDR3-1                 ; MSB
 _FILNC
-        CMP     ADDR2-1, ADDR3-1        ; MSB pointer check
+        CMP     ADDR2, ADDR3        ; MSB pointer check
         JZ      _FLCHK
         JMP     _FILLOOP
 _FLCHK        
-        CMP     ADDR2, ADDR3            ; LSB pointer check
+        CMP     ADDR2-1, ADDR3-1            ; LSB pointer check
         JZ      _FILDONE
 
         JMP     _FILLOOP
@@ -434,8 +404,6 @@ _FILERR
 _FILDONE
         RETS
         
-FILER1MSG
-        DB      " -- Incorrect format. Should be: 'Fssss eeee dd'", CR, LF, 0
 FILER2MSG
         DB      " -- Incorrect address order. Should be: ssss < eeee", CR, LF, 0
 
@@ -534,54 +502,69 @@ _CRDONE
 RAMTEST
         CALL    @FIRSTADR
         CALL    @SECONADR
-        MOVD    #RTSTRTMSG, MSGPTR
+        MOVD    #RTSTRTMSG, MSGPTR      ; "Starting four phase RAM test."
         CALL    @OUTSTR
+        
+        CALL    @OUT1STAD
+        MOV     #" ", A
+        CALL    @OUTCHR
+        CALL    @OUT2NDAD
+        MOV     #" ", A
+        CALL    @OUTCHR
+        
         ; first phase, fill with 00h
-        MOV     #00h, DATA
+        MOVD    ADDR1, ADDR3
+        MOV     #00h, A
+        MOV     #"1", COUNT1
 _RT1LOOP
         STA     *ADDR3 
         CMPA    *ADDR3
-        JNZ     _RT2ER1
+        JNZ     _RT12ER1
         INC     ADDR3
         JNC     _RT1NC
-        INC     ADDR3
+        INC     ADDR3-1
 _RT1NC
         CMP     ADDR2-1, ADDR3-1        ; MSB pointer check
         JZ      _RT1CHK
-        JMP     _RT2LOOP
+        JMP     _RT1LOOP
 _RT1CHK        
         CMP     ADDR2, ADDR3            ; LSB pointer check
         JZ      _RT1DONE
         JMP     _RT1LOOP
         
+_RT1DONE
         MOVD    #RT1DONMSG, MSGPTR
         CALL    @OUTSTR
-_RT1DONE
         JMP     _RT2PHASE
         
-_RT2ER1         ; " data not 00h error at "
+_RT12ER1         ; " data not 00h error at "
+        MOV     COUNT1, A
+        CALL    @OUTCHR
+        MOV     #" ", A
+        CALL    @OUTCHR
         MOVD    #RT2ERMSG, MSGPTR
         CALL    @OUTSTR
         MOV     ADDR3-1, A
         CALL    @OUTHEX
         MOV     ADDR3, A
         CALL    @OUTHEX
-        JMP     _RTDONE
+        BR     _RTDONE
 
 _RT2PHASE
         ; second phase
         MOVD    ADDR1, ADDR3
+        MOV     #"2", COUNT1
 _RT2LOOP
         CLR     A
         CMPA    *ADDR3                  ; check each byte for initial 00h
-        JNZ     _RT2ER1
+        JNZ     _RT12ER1
         MOV     #055h, A
         STA     *ADDR3                  ; change byte to 055h
         CMPA    *ADDR3                  ; check new value
         JNZ     _RT23ER2
         INC     ADDR3
         JNC     _RT2NC
-        INC     ADDR3
+        INC     ADDR3-1
 _RT2NC
         CMP     ADDR2-1, ADDR3-1        ; MSB pointer check
         JZ      _RT2CHK
@@ -596,17 +579,18 @@ _RT2DONE
        
         ; third phase
         MOVD    ADDR1, ADDR3
+        MOV     #"3", COUNT1
 _RT3LOOP
         MOV     #055h, A
         CMPA    *ADDR3                  ; check each byte for initial 00h
         JNZ     _RT23ER2                ;  " data not 55h error at "
         MOV     #0AAh, A
-        STA     *ADDR3                  ; change byte to 055h
+        STA     *ADDR3                  ; change byte to 0AAh
         CMPA    *ADDR3                  ; check new value
-        JNZ     _RT3ER1                 ; " data not 0AAh error at "
+        JNZ     _RT34ER1                 ; " data not 0AAh error at "
         INC     ADDR3
         JNC     _RT3NC
-        INC     ADDR3
+        INC     ADDR3-1
 _RT3NC
         CMP     ADDR2-1, ADDR3-1        ; MSB pointer check
         JZ      _RT3CHK
@@ -619,17 +603,11 @@ _RT3DONE
         MOVD    #RT3DONMSG, MSGPTR
         CALL    @OUTSTR
         
-        ; fourth phase fill with 0FFh
-        MOV     #0FFh, DATA
-        CALL    @FILRT
-        MOVD    #RT4DONMSG, MSGPTR
-        CALL    @OUTSTR
-        
-_RTDONE        
-        RETS
-
-        
 _RT23ER2       ;  " data not 55h error at "
+        MOV     COUNT1, A
+        CALL    @OUTCHR
+        MOV     #" ", A
+        CALL    @OUTCHR
         MOVD    #RT23ERMSG, MSGPTR
         CALL    @OUTSTR
         MOV     ADDR3-1, A
@@ -638,7 +616,41 @@ _RT23ER2       ;  " data not 55h error at "
         CALL    @OUTHEX
         JMP     _RTDONE
         
-_RT3ER1       ;  " data not AAh error at "
+        ; fourth phase fill with 0FFh
+        MOVD    ADDR1, ADDR3
+        MOV     #"4", COUNT1
+_RT4LOOP
+        MOV     #0AAh, A
+        CMPA    *ADDR3                  ; check each byte for initial 00h
+        JNZ     _RT34ER1                ;  " data not 55h error at "
+        MOV     #0FFh, A
+        STA     *ADDR3                  ; change byte to 055h
+        CMPA    *ADDR3                  ; check new value
+        JNZ     _RT4ER1                 ; " data not 0AAh error at "
+        INC     ADDR3
+        JNC     _RT4NC
+        INC     ADDR3-1
+_RT4NC
+        CMP     ADDR2-1, ADDR3-1        ; MSB pointer check
+        JZ      _RT3CHK
+        JMP     _RT3LOOP
+_RT4CHK        
+        CMP     ADDR2, ADDR3            ; LSB pointer check
+        JZ      _RT3DONE
+        JMP     _RT3LOOP
+_RT4DONE
+        MOVD    #RT3DONMSG, MSGPTR
+        CALL    @OUTSTR
+               
+_RTDONE        
+        RETS
+
+        
+_RT34ER1       ;  " data not AAh error at "
+        MOV     COUNT1, A
+        CALL    @OUTCHR
+        MOV     #" ", A
+        CALL    @OUTCHR
         MOVD    #RT3ERMSG, MSGPTR
         CALL    @OUTSTR
         MOV     ADDR3-1, A
@@ -661,17 +673,17 @@ RTER1MSG
 RTSTRTMSG
         DB      "Starting four phase RAM test.", CR, LF, 0
 RT1DONMSG
-        DB      "Phase 1, all 00h, done.", CR, LF, 0
+        DB      "Phase 1, ?? > 000h check done.", CR, LF, 0
 RT2DONMSG
-        DB      "Phase 2, 055h and check done.", CR, LF, 0
+        DB      "Phase 2, 000h > 055h check done.", CR, LF, 0
 RT3DONMSG
-        DB      "Phase 3, 0AAh and check done.", CR, LF, 0
+        DB      "Phase 3, 055h > 0AAh check done.", CR, LF, 0
 RT4DONMSG        
-        DB      "Phase 4, all 0FFh, done.", CR, LF, 0
+        DB      "Phase 4, 0AAh > 0FFh check done.", CR, LF, 0
 RT2ERMSG
-        DB      " data not 00h error at ", 0
+        DB      " data not 000h error at ", 0
 RT23ERMSG
-        DB      " data not 55h error at ", 0
+        DB      " data not 055h error at ", 0
 RT3ERMSG
         DB      " data not 0AAh error at ", 0
 RT4ERMSG
@@ -742,6 +754,41 @@ _VP_DONE
         RETS
 
 VPERMSG DB      " -- Incorrect format. Must be 'Vssss eeee nnnn' and ssss < eeee.", CR, LF, 0
+
+;;**********************************************************************
+;; Test
+;;**********************************************************************
+
+CMD_TEST
+        CALL    @COLLECT
+;        MOVD    CLBUFP, MSGPTR
+;        CALL    @OUTSTR
+        CALL    @NEWLINE
+        
+        MOV     #0, B
+        CALL    @FIRSTADR
+;        CALL    @SECONADR
+;        CALL    @THIRDADR
+        MOV     #5, B
+        CALL    @GETDATA
+        MOV     A, DATA
+        
+        CALL    @NEWLINE
+        
+        CALL    @OUT1STAD
+        MOV     #" ", A
+        CALL    @OUTCHR
+        
+        MOVD    ADDR1, R241
+;        
+;        CALL    @OUT2NDAD
+;        MOV     #" ", A
+;        CALL    @OUTCHR
+        
+;        CALL    @OUT3RDAD
+        CALL    @OUTDATA
+        CALL    @NEWLINE
+        RETS
 
 ;;**********************************************************************
 ;; Messages

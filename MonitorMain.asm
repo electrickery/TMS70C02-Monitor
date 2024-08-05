@@ -8,7 +8,7 @@
 
 VERSMYR EQU     "0"
 VERSMIN EQU     "3"
-VERSPAT EQU     "0"
+VERSPAT EQU     "1"
 
 ; Constants
 HIBITMK EQU     7Fh
@@ -166,16 +166,21 @@ _MC15
         CALL    @CMD_RAMT
         JMP      _MC99
 _MC17
-        CMP     #'V', A
+        CMP     #'T', A
         JNZ     _MC19
-        CALL    @CMD_COPY
+        CALL    @CMD_TEST
         JMP      _MC99
 _MC19
-        CMP     #':', A
+        CMP     #'V', A
         JNZ     _MC21
-        CALL    @CMD_HXINT
+        CALL    @CMD_COPY
         JMP      _MC99
 _MC21
+        CMP     #':', A
+        JNZ     _MC23
+        CALL    @CMD_HXINT
+        JMP      _MC99
+_MC23
 
 _MC99
         RETS

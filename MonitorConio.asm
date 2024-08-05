@@ -66,6 +66,31 @@ _OSNOC   JNE     OUTSTR
 _OUTSTRX RETS  
 
 ;;**********************************************************************
+;; OUTNIBH
+;; OUTPUT High 4 bits of A as 1 HEX Digit
+;; OUTNIBL
+;; OUTPUT Low 4 bits of A as 1 HEX Digit
+;;**********************************************************************
+OUTNIBH SWAP    A           ; OUT HEX LEFT HEX DIGIT
+OUTNIBL AND     #00Fh, A    ; OUT HEX RIGHT HEX DIGIT
+        OR      #'0', A
+        CMPA    #':'
+        JL      _OUTNIBX
+        ADD     #7, A
+_OUTNIBX CALL    @OUTCHR
+        RETS 
+     
+;;**********************************************************************
+;; OUTHEX
+;; Output A as 2 HEX digits
+;;**********************************************************************
+OUTHEX  PUSH    A
+        CALL    @OUTNIBH     ; Print High 4 bits
+        POP     A            ; Get A from B 
+        CALL    @OUTNIBL     ; Print Low 4 Bits
+        RETS
+       
+;;**********************************************************************
 ; TOUPPER
 ; converts character in A in range a-z to A-Z
 ;;**********************************************************************  
@@ -82,75 +107,93 @@ _TPNOT
 ; FIRSTADR, SECONADR, GETDATA - interpret command line as 'ssss eeee dd'
 ;  to be replaced by a generic routine, similar to GETDATA
 ;;**********************************************************************
-FIRSTADR        
-        MOV     CLBUF,   A
-        MOV     CLBUF+1, B
-        CALL    @CHRS2BIN
-        MOV     A, ADDR1-1      ; MSB start
-
-        MOV     CLBUF+2, A
-        MOV     CLBUF+3, B
-        CALL    @CHRS2BIN
-        MOV     A, ADDR1       ; LSB start
+FIRSTADR
+        MOV     #0, B
+        CALL    @GETADDR
+        MOV     A, ADDR1-1
+        MOV     B, ADDR1
         RETS
 
 SECONADR
-        MOV     CLBUF+5,   A
-        MOV     CLBUF+6, B
-        CALL    @CHRS2BIN
-        MOV     A, ADDR2-1      ; MSB end
-
-        MOV     CLBUF+7, A
-        MOV     CLBUF+8, B
-        CALL    @CHRS2BIN
-        MOV     A, ADDR2       ; LSB end
+        MOV     #5, B           ; at index 5
+        CALL    @GETADDR
+        MOV     A, ADDR2-1
+        MOV     B, ADDR2
         RETS
 
 THIRDADR
-        MOV     #10, B          ; 10
-        LDA     CLBUF(B)
-        PUSH    A
-        INC     B
-        MOV     B, DREG
-        LDA     CLBUF(B)        ; 11
-        MOV     A, B
-        POP     A
-        CALL    @CHRS2BIN
+        MOV     #10, B          ; at index 10
+        CALL    @GETADDR
         MOV     A, ADDR4-1
-        
-        MOV     DREG, B
-        INC     B
-        LDA     CLBUF(B)        ; 12
-        PUSH    A
-        INC     B
-        LDA     CLBUF(B)        ; 13
-        MOV     A, B
-        POP     A
-        CALL    @CHRS2BIN
-        MOV     A, ADDR4
-        
+        MOV     B, ADDR4
         RETS
 
-;;
+;;**********************************************************************
 ; GETADDR - generic ASCII command-line retrieval. 
 ;           On input B contains the index to the first character.
 ;           Output: A is MSB, B is LSB 
-;;
+;;**********************************************************************
 GETADDR
-
+        LDA     CLBUF(B)        ; B = +0 CLBUF pointer
+        PUSH    A               ; A = 1st MSB char
+        INC     B
+        MOV     B, DREG         ; B, DREG = +1 CLBUF pointer
+        LDA     CLBUF(B)        
+        MOV     A, B            ; A, B = 2nd MSB char
+        POP     A               ; A = 1st MSB char
+        CALL    @CHRS2BIN       ; A, B input chars
+        PUSH    A               ; A = address MSB
+        
+        MOV     DREG, B         ; B = +1 CLBUF pointer
+        INC     B               ; B = +2 CLBUF pointer
+        LDA     CLBUF(B)
+        PUSH    A               ; A = 1st LSB char
+        INC     B               ; B = +3 CLBUF pointer
+        MOV     B, DREG         ; B, DREG = +3 CLBUF pointer
+        LDA     CLBUF(B)
+        MOV     A, B            ; A, B = 2nd LSB char
+        POP     A               ; A = 1st LSB char
+        CALL    @CHRS2BIN       ; A, B input chars
+        MOV     A, B            ; A, B = address LSB
+        POP     A               ; A = address MSB
         RETS
         
+
 ;;**********************************************************************
-; GETDATA - retrieve data from CLBUF, using B as index pointer
+; GETDATA - retrieve data from two CLBUF bytes, using B as index pointer
 ;;**********************************************************************
 GETDATA                        ; 
         LDA     CLBUF(B)
         PUSH    A
         INC     B
         LDA     CLBUF(B)
-        PUSH    A
-        POP     B
+        MOV     A, B
         POP     A
         CALL    @CHRS2BIN
-        MOV     A, DATA
         RETS        
+
+OUT1STAD
+        MOV     ADDR1-1, A    ; MSB
+        CALL    @OUTHEX
+        MOV     ADDR1, A    ; LSB
+        CALL    @OUTHEX
+        RETS
+        
+OUT2NDAD
+        MOV     ADDR2-1, A    ; MSB
+        CALL    @OUTHEX
+        MOV     ADDR2, A    ; LSB
+        CALL    @OUTHEX
+        RETS
+        
+OUT3RDAD
+        MOV     ADDR4-1, A    ; MSB
+        CALL    @OUTHEX
+        MOV     ADDR4, A    ; LSB
+        CALL    @OUTHEX
+        RETS
+
+OUTDATA
+        MOV     DATA, A
+        CALL    @OUTHEX
+        RETS
