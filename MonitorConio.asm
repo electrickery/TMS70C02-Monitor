@@ -130,9 +130,16 @@ THIRDADR
         MOV     A, ADDR4
         
         RETS
+
+;;
+; GETADDR - generic ASCII command-line retrieval. 
+;           On input B contains the index to the first character.
+;           Output: A is MSB, B is LSB 
+;;
+GETADDR
+
+        RETS
         
-
-
 ;;**********************************************************************
 ; GETDATA - retrieve data from CLBUF, using B as index pointer
 ;;**********************************************************************

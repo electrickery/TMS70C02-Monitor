@@ -334,12 +334,14 @@ OUTHEX  PUSH    B
 ;; CHRS2BIN - MSN-char in A, LSN-char in B. Returned value in A
 ;;
 CHRS2BIN
+        PUSH    CREG
         CALL    @CHR2NIB
         SWAP    A
         MOV     A, CREG
         MOV     B, A
         CALL    @CHR2NIB
         OR      CREG, A        ; Merge nibbles
+        POP     CREG
         RETS
         
 ;;                     0-9      A-F      a-f
@@ -388,11 +390,13 @@ CMD_FILL
         CALL    @FILLER
         
 _CF_ERR        
-        MOV     CLBUFP, B       ; find command line length
-        SUB     #CLBUF, B       ; 
+        MOVD    #FILER1MSG, MSGPTR
+        CALL    @OUTSTR
 
 _CFABORT
         RETS
+        
+
 
 ;;**********************************************************************
 ;; FILLER
@@ -534,10 +538,37 @@ RAMTEST
         CALL    @OUTSTR
         ; first phase, fill with 00h
         MOV     #00h, DATA
-        CALL    @FILRT                  ; reuse bit of filler
+_RT1LOOP
+        STA     *ADDR3 
+        CMPA    *ADDR3
+        JNZ     _RT2ER1
+        INC     ADDR3
+        JNC     _RT1NC
+        INC     ADDR3
+_RT1NC
+        CMP     ADDR2-1, ADDR3-1        ; MSB pointer check
+        JZ      _RT1CHK
+        JMP     _RT2LOOP
+_RT1CHK        
+        CMP     ADDR2, ADDR3            ; LSB pointer check
+        JZ      _RT1DONE
+        JMP     _RT1LOOP
+        
         MOVD    #RT1DONMSG, MSGPTR
         CALL    @OUTSTR
-         
+_RT1DONE
+        JMP     _RT2PHASE
+        
+_RT2ER1         ; " data not 00h error at "
+        MOVD    #RT2ERMSG, MSGPTR
+        CALL    @OUTSTR
+        MOV     ADDR3-1, A
+        CALL    @OUTHEX
+        MOV     ADDR3, A
+        CALL    @OUTHEX
+        JMP     _RTDONE
+
+_RT2PHASE
         ; second phase
         MOVD    ADDR1, ADDR3
 _RT2LOOP
@@ -568,11 +599,11 @@ _RT2DONE
 _RT3LOOP
         MOV     #055h, A
         CMPA    *ADDR3                  ; check each byte for initial 00h
-        JNZ     _RT23ER2
+        JNZ     _RT23ER2                ;  " data not 55h error at "
         MOV     #0AAh, A
         STA     *ADDR3                  ; change byte to 055h
         CMPA    *ADDR3                  ; check new value
-        JNZ     _RT23ER2
+        JNZ     _RT3ER1                 ; " data not 0AAh error at "
         INC     ADDR3
         JNC     _RT3NC
         INC     ADDR3
@@ -598,16 +629,7 @@ _RTDONE
         RETS
 
         
-_RT2ER1
-        MOVD    #RT2ERMSG, MSGPTR
-        CALL    @OUTSTR
-        MOV     ADDR3-1, A
-        CALL    @OUTHEX
-        MOV     ADDR3, A
-        CALL    @OUTHEX
-        JMP     _RTDONE
-        
-_RT23ER2        
+_RT23ER2       ;  " data not 55h error at "
         MOVD    #RT23ERMSG, MSGPTR
         CALL    @OUTSTR
         MOV     ADDR3-1, A
@@ -616,6 +638,24 @@ _RT23ER2
         CALL    @OUTHEX
         JMP     _RTDONE
         
+_RT3ER1       ;  " data not AAh error at "
+        MOVD    #RT3ERMSG, MSGPTR
+        CALL    @OUTSTR
+        MOV     ADDR3-1, A
+        CALL    @OUTHEX
+        MOV     ADDR3, A
+        CALL    @OUTHEX
+        JMP     _RTDONE
+        
+_RT4ER1       ;  " data not FFh error at "
+        MOVD    #RT4ERMSG, MSGPTR
+        CALL    @OUTSTR
+        MOV     ADDR3-1, A
+        CALL    @OUTHEX
+        MOV     ADDR3, A
+        CALL    @OUTHEX
+        JMP     _RTDONE
+
 RTER1MSG
         DB      " -- Incorrect format. Should be: 'Rssss eeee'", CR, LF, 0        
 RTSTRTMSG
@@ -634,6 +674,8 @@ RT23ERMSG
         DB      " data not 55h error at ", 0
 RT3ERMSG
         DB      " data not 0AAh error at ", 0
+RT4ERMSG
+        DB      " data not 0FFh error at ", 0
         
 ;;**********************************************************************        
 ;  CMD_HXINT - download Hex-Intel files. To be implemented.

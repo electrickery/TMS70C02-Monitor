@@ -167,7 +167,7 @@ _MC15
         JMP      _MC99
 _MC17
         CMP     #'V', A
-        JNZ     _MC17
+        JNZ     _MC19
         CALL    @CMD_COPY
         JMP      _MC99
 _MC19
