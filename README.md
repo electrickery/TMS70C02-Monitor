@@ -10,18 +10,19 @@ the TMS70C02 has an internal serial port, and it is simpler.
 
 Here the actual and planned (with * prefix) commands:
 
-        ** TMS70C02 Monitor Help Menu V0.2.0 **
+        ** TMS70C02 Monitor Help Menu V0.3.0 **
+
          Caaaa - Call subroutine at aaaa
-         D[||+|-|[aaaa[-bbbb]]] - Dump memory from aaaa to bbbb
+         D[||+|-|aaaa[-bbbb]] - Dump memory from aaaa to bbbb
          E[e] - View/set echo
-         Faaaa eeee dd - Fill memory from aaaa to eeee with dd
+         Faaaa eeee dd - Fill memory from aaaa to eeee-1 with dd
          Gaaaa - jump to address aaaa
          Maaaa bb - Modify memory location
          H - Help menu
          Raaaa eeee - RAM test from aaaa to eeee
+         Vssss eeee nnnn - Copy memory range ssss to eeee to nnnn
         *:ssaaaattdddddd....ddcc - receive Intel-hex record
          * = not yet implemented
-
 
 
 ## Development environment
@@ -38,4 +39,17 @@ side.
 The current hardware setup looks like this:
 ![TMS70C02 board with ROMemu 1.1](devEnv20240801.jpg)
 
+Since that photo the reset-relay feature was added to make download and
+restart automatic.
+
+## Origin
+
+The project is inspired by the Multi T project 
+(https://hackaday.io/project/19276-multi-t) from Jaak Bartok. All the 
+scanned documentation found here: https://electrickery.nl/comp/tms7k/doc/
+was borrowed from Jaak. Thanks!
+
+The monitor is inspired by a similar project by Eric.M. KLaus: 
+https://sites.google.com/site/ericmklaus/projects-1/tms70c02-sbc-project.
+Some routines are still his code! Thanks!
 

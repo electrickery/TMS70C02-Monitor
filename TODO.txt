@@ -6,4 +6,5 @@ To do list TMS70C02 Monitor
 - refactor the address extraction from the command line buffer to a 
   generic routine like THIRDADR but better
 - implement backspace on the collect routine as rudimentary edit feature
+- implement a 'previous command line' retrieval key (up-arrow?)
 - actually implement the hex-intel code.

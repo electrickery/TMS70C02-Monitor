@@ -2,10 +2,11 @@
 #
 
 FILE=$1
-ASM=/mnt/M/Programming/c/asl-current/asl
-P2BIN=/mnt/M/Programming/c/asl-current/p2bin
-P2HEX=/mnt/M/Programming/c/asl-current/p2hex
 FILEBASE=${FILE%%.*}
+PATH=/mnt/M/Programming/c/asl-current
+ASM=$PATH/asl
+P2BIN=$PATH/p2bin
+P2HEX=$PATH/p2hex
 TARGET=TMS70C02
 
 rm -f $FILEBASE.p $FILEBASE.lst $FILEBASE.bin $FILEBASE.hex
