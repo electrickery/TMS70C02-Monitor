@@ -10,7 +10,7 @@ the TMS70C02 has an internal serial port, and it is simpler.
 
 Here the actual and planned (with * prefix) commands:
 
-        ** TMS70C02 Monitor Help Menu V0.3.0 **
+        ** TMS70C02 Monitor Help Menu V0.3.2 **
 
          Caaaa - Call subroutine at aaaa
          D[||+|-|aaaa[-bbbb]] - Dump memory from aaaa to bbbb
