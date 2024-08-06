@@ -1,11 +1,8 @@
 To do list TMS70C02 Monitor
 
-- debug the RAM test
 - fix Gaaaa (jump) and Caaaa (call)
 - refactor RAM test code; abstract the phase 2, 3, 4 code to a generic
   routine.
-- refactor the address extraction from the command line buffer to a 
-  generic routine like THIRDADR but better
 - implement backspace on the collect routine as rudimentary edit feature
 - implement a 'previous command line' retrieval key (up-arrow?)
 - actually implement the hex-intel code.

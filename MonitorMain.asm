@@ -2,13 +2,15 @@
 ; asl -cpu TMS70C02 MonitorMain.asm -o MonitorMain.p -L -olist MonitorMain.lst -v -C
 ; p2hex MonitorMain.p MonitorMain.hex
 
-        INCLUDE PR_TMS70C02.asm
-        
+; All labels prefixed with a '_' are internal to the routine only, not 
+; to be used outside it. In the Geany symbols list this keeps them sorted 
+; apart from the main labels.
 
+        INCLUDE PR_TMS70C02.asm
 
 VERSMYR EQU     "0"
 VERSMIN EQU     "3"
-VERSPAT EQU     "1"
+VERSPAT EQU     "2"
 
 ; Constants
 HIBITMK EQU     7Fh
@@ -84,6 +86,12 @@ START   MOV     #SP, B
         CALL    @UARTINIT               ; Setup UART for 9600b
 ;        EINT
 
+;MON_PRMPT_LOOP:
+        ; Print monitor prompt
+        ; Get a character from user into Acc
+        ; Call appropriate routine via MONCNDS 
+        ; Loop 
+
 ;;**********************************************************************        
 ;; Main loop
 ;;**********************************************************************        
@@ -106,18 +114,20 @@ _LCONT
         XORP    %00000011b, PORTB
         JMP     _LOOP
         
-        
-;MON_PRMPT_LOOP:
-        ;Print monitor prompt
-        ;Get a character from user into Acc
-        ;Print a new line
-        ;Respond to user input
-        ;Print a new line	
-;        JMP      MON_PRMPT_LOOP
-;;**********************************************************************        
+INITMSG
+        DB      CR, LF, "** TMS70C02 Monitor Help Menu V", VERSMYR, ".", VERSMIN, ".", VERSPAT, " **", CR, LF, 0
 
-; ***** Interpreter
-       
+;;**********************************************************************        
+;; Prompt
+;;**********************************************************************        
+PROMPT  CALL    @NEWLINE
+        MOV     #'>', A
+        CALL    @OUTCHR
+        RETS
+
+;;**********************************************************************        
+; ***** Interpreter - used by most commands, HELP being the exception
+;;**********************************************************************        
 MONCMDS
         CALL    @OUTCHR
         CALL    @TOUPPER
@@ -153,7 +163,7 @@ _MC07
 _MC09        
         CMP     #'?', A
         JNZ     _MC13
-        CALL    @CMD_HELP
+        CALL    @CMD_HELP ; produces direct output
         JMP     _MC99
 _MC13
         CMP     #'M', A
@@ -221,19 +231,52 @@ _COLLDONE                       ; CR pressed
         STA     *CLBUFP         ; terminate the buffer
         RETS
         
-;COLLDBG
-;        MOV     #" ", A
-;        CALL    @OUTCHR
-;        MOV     #CLBUFE, A
-;        CALL    @OUTHEX
-;        MOV     #"?", A
-;        CALL    @OUTCHR
-;        MOV     CLBUFP, A
-;        CALL    @OUTHEX
-;        MOV     #" ", A
-;        
-;        RETS
+CLBERMSG
+        DB      CR, LF, "Command line buffer overflow.", CR, LF, 0
         
+CLBESCMSG
+        DB      CR, LF, "ESC", CR, LF, 0
+
+;; Basic routines, touching actual hardware
+        
+;;**********************************************************************
+; OUTCHR  Send Serial 1 byte from A (PORTB Bit3=TXD)
+; A,B are unchanged uses R33 (OUTBYTE)
+;;**********************************************************************
+OUTCHR  PUSH    A
+_TXEMPTY 
+        MOVP    SSTAT, A    ; SSTAT-P22  Bit0=TXRDY
+        AND     %TXBSYBT, A
+        JZ      _TXEMPTY     ; 0=TXBUSY keep checking...
+        POP     A
+        MOVP    A, TXBUF    ; TXBUF=P26  A->TXBUF 
+        RETS
+
+;;**********************************************************************
+; CHKKEY test if RXBUF is full (data available)
+; RETURNS: Z=0 if data is available
+;;**********************************************************************
+CHKKEY  MOVP SSTAT, A   ;Get UART SSTAT reg    9 cycles
+        AND  %02h, A    ;Test for RXRDY bit    7 cycles
+        RETS            ;Return Z=0 (NOT Zero return 0x20) if data otherwise zero  7 cycles
+
+
+;;**********************************************************************
+; WAIT4BYTE  Wait for serial char, only return when it arrived
+;;**********************************************************************
+WAIT4BYTE 
+_WAITKEY CALL    @CHKKEY  
+        JZ      _WAITKEY    ; If NOT SET keep checking
+        ; Automatically runs GETBYTE when char received
+;;**********************************************************************   
+; Get byte from receive buffer 
+;;**********************************************************************    
+GETBYTE MOVP    RXBUF, A    ; RXBUF -> A
+;        BTJZ    SYSFLGS, 01h, _GNBOECHO
+;        CALL    @OUTCHR
+_GNBOECHO
+        RETS
+               
 ; E.M. Klaus code modified & annotated
 ;;**********************************************************************
 ;; UARTINIT Setup UART for 9600b 8 data 1 stop No Parity
@@ -249,16 +292,8 @@ UARTINIT
         MOVP    %0C0h, SCTL1    ;SCTL1 =C0 11000000   Use Timer3, no prescale bits
         RETS
         
-CLBERMSG
-        DB      CR, LF, "Command line buffer overflow.", CR, LF, 0
-        
-CLBESCMSG
-        DB      CR, LF, "ESC", CR, LF, 0
-        
-        
         ORG    0FFF6h           ; Set up 4 vectors 
                                 ; =interrupts 
         DW    START, START, START, START, START 
-        
         
         END

@@ -1,95 +1,10 @@
-;MonitorConio3
+;MonitorConio
 
 ;;**********************************************************************
-; OUTCHR  Send Serial 1 byte from A (PORTB Bit3=TXD)
-; A,B are unchanged uses R33 (OUTBYTE)
-;;**********************************************************************
-OUTCHR  PUSH    A
-_TXEMPTY 
-        MOVP    SSTAT, A    ; SSTAT-P22  Bit0=TXRDY
-        AND     %TXBSYBT, A
-        JZ      _TXEMPTY     ; 0=TXBUSY keep checking...
-        POP     A
-        MOVP    A, TXBUF    ; TXBUF=P26  A->TXBUF 
-        RETS
+;  Common (intermediate) routines for the TMS70C02 serial monitor 
+;;**********************************************************************  
 
-;;**********************************************************************
-; CHKKEY test if RXBUF is full (data available)
-; RETURNS: Z=0 if data is available
-;;**********************************************************************
-CHKKEY  MOVP SSTAT, A   ;Get UART SSTAT reg    9 cycles
-        AND  %02h, A    ;Test for RXRDY bit    7 cycles
-        RETS            ;Return Z=0 (NOT Zero return 0x20) if data otherwise zero  7 cycles
 
-;;**********************************************************************
-; WAIT4BYTE  Wait for serial char, only return when it arrived
-;;**********************************************************************
-WAIT4BYTE 
-_WAITKEY CALL    @CHKKEY  
-        JZ      _WAITKEY    ; If NOT SET keep checking
-;;**********************************************************************   
-; Get byte from receive buffer 
-;;**********************************************************************    
-GETBYTE MOVP    RXBUF, A    ; RXBUF -> A
-;        BTJZ    SYSFLGS, 01h, _GNBOECHO
-;        CALL    @OUTCHR
-_GNBOECHO
-        RETS
-        
-NEWLINE MOV     #CR, A
-        CALL    @OUTCHR
-        MOV     #LF, A
-        CALL    @OUTCHR
-        RETS
-
-; ***** Prompt
-
-PROMPT  CALL    @NEWLINE
-        MOV     #'>', A
-        CALL    @OUTCHR
-        RETS
-
-;;**********************************************************************
-;; OUTSTR
-;; Output A string pointed to by RP37&38
-;;**********************************************************************
-OUTSTR  LDA     *MSGPTR    ; (RP38 & R37) -> A
-        TSTA               ; Test for Zero  (end of string)
-        JZ      _OUTSTRX    ; If Zero then EXIT
-        CALL    OUTCHR     ; Otherwise output the character
-        INC     MSGPTR     ; Inc MSGPTR
-        JNZ     _OSNOC
-        INC     MSGPTR-1
-_OSNOC   JNE     OUTSTR
-        INC     MSGPTR
-        BR      OUTSTR     ; Continue...
-_OUTSTRX RETS  
-
-;;**********************************************************************
-;; OUTNIBH
-;; OUTPUT High 4 bits of A as 1 HEX Digit
-;; OUTNIBL
-;; OUTPUT Low 4 bits of A as 1 HEX Digit
-;;**********************************************************************
-OUTNIBH SWAP    A           ; OUT HEX LEFT HEX DIGIT
-OUTNIBL AND     #00Fh, A    ; OUT HEX RIGHT HEX DIGIT
-        OR      #'0', A
-        CMPA    #':'
-        JL      _OUTNIBX
-        ADD     #7, A
-_OUTNIBX CALL    @OUTCHR
-        RETS 
-     
-;;**********************************************************************
-;; OUTHEX
-;; Output A as 2 HEX digits
-;;**********************************************************************
-OUTHEX  PUSH    A
-        CALL    @OUTNIBH     ; Print High 4 bits
-        POP     A            ; Get A from B 
-        CALL    @OUTNIBL     ; Print Low 4 Bits
-        RETS
-       
 ;;**********************************************************************
 ; TOUPPER
 ; converts character in A in range a-z to A-Z
@@ -103,31 +18,6 @@ TOUPPER
 _TPNOT
         RETS
         
-;;**********************************************************************
-; FIRSTADR, SECONADR, GETDATA - interpret command line as 'ssss eeee dd'
-;  to be replaced by a generic routine, similar to GETDATA
-;;**********************************************************************
-FIRSTADR
-        MOV     #0, B
-        CALL    @GETADDR
-        MOV     A, ADDR1-1
-        MOV     B, ADDR1
-        RETS
-
-SECONADR
-        MOV     #5, B           ; at index 5
-        CALL    @GETADDR
-        MOV     A, ADDR2-1
-        MOV     B, ADDR2
-        RETS
-
-THIRDADR
-        MOV     #10, B          ; at index 10
-        CALL    @GETADDR
-        MOV     A, ADDR4-1
-        MOV     B, ADDR4
-        RETS
-
 ;;**********************************************************************
 ; GETADDR - generic ASCII command-line retrieval. 
 ;           On input B contains the index to the first character.
@@ -172,6 +62,31 @@ GETDATA                        ;
         CALL    @CHRS2BIN
         RETS        
 
+;;**********************************************************************
+; FIRSTADR, SECONADR, GETDATA - interpret command line as 'ssss eeee dd'
+;  to be replaced by a generic routine, similar to GETDATA
+;;**********************************************************************
+FIRSTADR
+        MOV     #0, B
+        CALL    @GETADDR
+        MOV     A, ADDR1-1
+        MOV     B, ADDR1
+        RETS
+
+SECONADR
+        MOV     #5, B           ; at index 5
+        CALL    @GETADDR
+        MOV     A, ADDR2-1
+        MOV     B, ADDR2
+        RETS
+
+THIRDADR
+        MOV     #10, B          ; at index 10
+        CALL    @GETADDR
+        MOV     A, ADDR4-1
+        MOV     B, ADDR4
+        RETS
+
 OUT1STAD
         MOV     ADDR1-1, A    ; MSB
         CALL    @OUTHEX
@@ -196,4 +111,120 @@ OUT3RDAD
 OUTDATA
         MOV     DATA, A
         CALL    @OUTHEX
+        RETS
+
+;;**********************************************************************
+;; INHEXBF  Fast INHEXB  No echo no checking for esc or CR
+;; Used for PC to Target communications like GETIHEX
+;;**********************************************************************
+INHEXBF PUSH    B                  ;Save original B
+        CALL    WAIT4BYTE            ;Get 1 char
+         
+        CMPA    #':'              ;> '9' ?? then add 9
+        JL      _INHEXF1
+        ADD     #9, A
+_INHEXF1  RL   A                   ;Shift low nibble to high nibble
+        RL      A          
+        RL      A
+        RL      A
+        AND     #0F0h, A           ;Mask low bits
+        PUSH    A                  ;Save high nibble on stack
+         
+        CALL    WAIT4BYTE            ;Get another char
+         
+        CMPA    #':'              ;> '9' ?? then add 9
+        JL      _INHEXF2
+        ADD     #9, A
+_INHEXF2 AND     #00Fh, A           ;Mask High nibble
+        POP     B                  ;get high nibble from stack ->B
+        OR      B,A                ;combine A & B
+        POP     B                  ;Original Restore B
+        RETS
+
+;;**********************************************************************
+;; CHRS2BIN - MSN-char in A, LSN-char in B. Returned value in A
+;;**********************************************************************
+CHRS2BIN
+        CALL    @CHR2NIB        ; return value in A, lower nibble
+        SWAP    A
+        MOV     A, CREG
+        MOV     B, A
+        CALL    @CHR2NIB
+        OR      CREG, A        ; Merge nibbles
+        RETS
+
+;;                     0-9      A-F      a-f
+;;                   30h-39h, 41h-46h, 61h-66h
+;; sub '0'            0h-9h,  11h-16h, 31h-36h
+;; if >9h sub 7       0h-9h,  0Ah-0Fh, 2Ah-2Fh
+;; if >0Fh sub 20h    0h-9h,  0Ah-0Fh, 0Ah-0Fh       
+CHR2NIB
+        SUB     #'0', A     ; (A)-'0'
+        CMP     #0Ah, A     ; (A)-'9' -- is it 0-9 ?
+        JN      _C2NOK      ; Jump if yes
+        SUB     #7, A
+        CMP     #10h, A     ; is it A-F ?
+        JN      _C2NOK
+        SUB     #20h, A
+
+_C2NOK
+        AND     #0Fh, A
+        RETS
+
+;;**********************************************************************
+;; INCADD3
+;;**********************************************************************   
+INCADD3 INC     ADDR3   ; next address LSB
+        JNZ     _INCA3X
+        INC     ADDR3-1 ; next address MSB
+_INCA3X  RETS
+
+;;**********************************************************************
+;; Output newline; C R + LF
+;;**********************************************************************   
+NEWLINE MOV     #CR, A
+        CALL    @OUTCHR
+        MOV     #LF, A
+        CALL    @OUTCHR
+        RETS
+
+;;**********************************************************************
+;; OUTSTR
+;; Output A string pointed to by RP37&38
+;;**********************************************************************
+OUTSTR  LDA     *MSGPTR    ; (RP38 & R37) -> A
+        TSTA               ; Test for Zero  (end of string)
+        JZ      _OUTSTRX    ; If Zero then EXIT
+        CALL    OUTCHR     ; Otherwise output the character
+        INC     MSGPTR     ; Inc MSGPTR
+        JNZ     _OSNOC
+        INC     MSGPTR-1
+_OSNOC   JNE     OUTSTR
+        INC     MSGPTR
+        BR      OUTSTR     ; Continue...
+_OUTSTRX RETS  
+
+;;**********************************************************************
+;; OUTNIBH
+;; OUTPUT High 4 bits of A as 1 HEX Digit
+;; OUTNIBL
+;; OUTPUT Low 4 bits of A as 1 HEX Digit
+;;**********************************************************************
+OUTNIBH SWAP    A           ; OUT HEX LEFT HEX DIGIT
+OUTNIBL AND     #00Fh, A    ; OUT HEX RIGHT HEX DIGIT
+        OR      #'0', A
+        CMPA    #':'
+        JL      _OUTNIBX
+        ADD     #7, A
+_OUTNIBX CALL    @OUTCHR
+        RETS 
+     
+;;**********************************************************************
+;; OUTHEX
+;; Output A as 2 HEX digits
+;;**********************************************************************
+OUTHEX  PUSH    A
+        CALL    @OUTNIBH     ; Print High 4 bits
+        POP     A            ; Get A from B 
+        CALL    @OUTNIBL     ; Print Low 4 Bits
         RETS
