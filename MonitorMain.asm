@@ -10,7 +10,7 @@
 
 VERSMYR EQU     "0"
 VERSMIN EQU     "3"
-VERSPAT EQU     "2"
+VERSPAT EQU     "3"
 
 ; Constants
 HIBITMK EQU     7Fh
@@ -41,6 +41,13 @@ CLBUFPM EQU     R30    ; 001Eh   ; R110 pointer MSB
 CLBUFP  EQU     R31    ; 001Fh   ; R111 command line buffer pointer LSB
 CLBUF   EQU     R32    ; 0020h   ; R112 - R127   command line buffer
 CLBUFE  EQU     R76    ; 004Ch   ;  command line buffer end
+
+KEYRCNT EQU     3
+KEYROW  EQU     R77
+DSPBUF  EQU     R78
+DSPBUFE EQU     R83
+
+
 SP      EQU     0080h   ; R128 and up
 
 ; DBC board:
@@ -56,7 +63,8 @@ SP      EQU     0080h   ; R128 and up
         INCLUDE MonitorConio.asm
         INCLUDE MonitorCommands.asm
 
-START   MOV     #SP, B
+; TRAP0
+RESET   MOV     #SP, B
         LDSP                            ; Set SP = 0x0080
         DINT                            ; Disable interrupts
         MOVP    #00101010b, IOCNT0  ; PO Clear INTI-, INT2, and INT3- flags, 
@@ -84,7 +92,8 @@ START   MOV     #SP, B
         MOVD    #00FFh,     ADDR2
         MOV     #00h,       DREG
         CALL    @UARTINIT               ; Setup UART for 9600b
-;        EINT
+        CALL    @INT2INIT
+        EINT
 
 ;MON_PRMPT_LOOP:
         ; Print monitor prompt
@@ -291,9 +300,56 @@ UARTINIT
         MOVP    %015h, SCTL0    ;SCTL0 =15 00010101   Tx & Rx Enabled
         MOVP    %0C0h, SCTL1    ;SCTL1 =C0 11000000   Use Timer3, no prescale bits
         RETS
+
+T2MSBD  EQU     0FFh ; 000h ; 0FFh
+T2LSBD  EQU     0FFh ; 025h ; 0FFh
+T2PSD   EQU     01Fh
+T2CL0D  EQU     10011111b
+
+;;**********************************************************************
+;; INT2INIT 3-41
+;; timer period = clock * (prescalerValue + 1) * (timer value + 1)
+;; 4.9152 MHz / 4 = 307200 Hz -> 8.1380e-07s. 8.1380e-07 * 32 * 65536 = 6.83s
+;; 4.9152 MHz / 4 = 307200 Hz -> 8.1380e-07s. 8.1380e-07 * 32 * 37 = 0.001s
+;;**********************************************************************
+INT2INIT ; Timer 2 Data 3.7, 3-42
+        MOVP    %T2MSBD, T2MDATA ; Load the actual T2MDATA register with initial MSB value
         
-        ORG    0FFF6h           ; Set up 4 vectors 
+        MOVP    %T2LSBD, T2LDATA ; Load the actual T2LDATA register with initial LSB value
+        
+        ; Timer Output Function 3.7.9, 3-50
+        MOVP    %01000000b, T2CTL1 ; bit 7=0; no cascade, bit 6=1; B0 toggle, bit 5-0; don't care
+        ; Timer and Prescalar Operation 3.7.7, 3-48
+        MOVP    %10011111b, T2CTL0 ; bit 7=1; reload & start, bit 6=0; internal clock, 
+                                  ; bit 5=0; timer active when idle, bit 4-0; prescaler
+        ; Interrupt Control 3.6.3, 3-32
+        MOVP    %10101110b, IOCNT0 ; bit 7-6=10; Full Expansion mode, 
+                                  ; bit 5-4=10; INT3 cleared & disabled, 
+                                  ; bit 3-2=11; INT2 cleared  & enabled, 
+                                  ; bit 1-0=10; INT1 cleared & disabled
+        MOVP    %00001010b, IOCNT1 ; bit 3-0=1010; INT4 & 5 cleared & disabled
+        MOVP    %00100010b, IOCNT2 ; bit 5-4=10: INT3 edge only, falling edge, 
+                                  ; bit 1-0=10; INT1 edge only, falling edge
+
+        RETS
+
+
+TRAP1
+        BR      RESET
+                
+TRAP2
+        MOVP    %10011111b, T2CTL0 ; set bit 7; reload & start INT2
+
+        RETI
+        
+TRAP3
+        BR     RESET
+        
+TRAP4
+        BR     RESET
+               
+        ORG    0FFF6h           ; Set up 5 vectors 
                                 ; =interrupts 
-        DW    START, START, START, START, START 
+        DW    TRAP4, TRAP3, TRAP2, TRAP1, RESET 
         
         END

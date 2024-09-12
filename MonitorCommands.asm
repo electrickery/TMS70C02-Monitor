@@ -249,16 +249,16 @@ CMD_HELP
 ;; Help messages
 ;;**********************************************************************
 HELPMSG
-        DB      CR, LF, " Caaaa - Call subroutine at aaaa"
-        DB      CR, LF, " D[||+|-|aaaa[-bbbb]] - Dump memory from aaaa to bbbb"
+        DB      CR, LF, " Cssss - Call subroutine at ssss"
+        DB      CR, LF, " D[||+|-|ssss[-eeee]] - Dump memory from ssss to eeee"
         DB      CR, LF, " E[e] - View/set echo"
-        DB      CR, LF, " Faaaa eeee dd - Fill memory from aaaa to eeee-1 with dd"
-        DB      CR, LF, " Gaaaa - jump to address aaaa"
-        DB      CR, LF, " Maaaa bb - Modify memory location"
+        DB      CR, LF, " Fssss eeee dd - Fill memory from ssss to eeee-1 with dd"
+        DB      CR, LF, " Gssss - jump to address aaaa"
+        DB      CR, LF, " Mssss dd - Modify memory location ssss to dd"
         DB      CR, LF, " H - Help menu"
-        DB      CR, LF, " Raaaa eeee - RAM test from aaaa to eeee"
+        DB      CR, LF, " Rssss eeee - RAM test from ssss to eeee"
         DB      CR, LF, " Vssss eeee nnnn - Copy memory range ssss to eeee to nnnn"
-        DB      CR, LF, "*:ssaaaattdddddd....ddcc - receive Intel-hex record"
+        DB      CR, LF, "*:llssssttdddddd....ddcc - receive Intel-hex record"
         DB      CR, LF, " * = not yet implemented", 0
 
 ;;**********************************************************************
