@@ -10,7 +10,7 @@
 
 VERSMYR EQU     "0"
 VERSMIN EQU     "3"
-VERSPAT EQU     "3"
+VERSPAT EQU     "5"
 
 ; Constants
 HIBITMK EQU     7Fh
@@ -42,10 +42,6 @@ CLBUFP  EQU     R31    ; 001Fh   ; R111 command line buffer pointer LSB
 CLBUF   EQU     R32    ; 0020h   ; R112 - R127   command line buffer
 CLBUFE  EQU     R76    ; 004Ch   ;  command line buffer end
 
-KEYRCNT EQU     3
-KEYROW  EQU     R77
-DSPBUF  EQU     R78
-DSPBUFE EQU     R83
 
 
 SP      EQU     0080h   ; R128 and up
@@ -92,8 +88,9 @@ RESET   MOV     #SP, B
         MOVD    #00FFh,     ADDR2
         MOV     #00h,       DREG
         CALL    @UARTINIT               ; Setup UART for 9600b
-        CALL    @INT2INIT
+        CALL    @INT5INIT
         EINT
+        CALL    @DSPINIT
 
 ;MON_PRMPT_LOOP:
         ; Print monitor prompt
@@ -120,7 +117,7 @@ _LNOCR
         CALL    @MONCMDS
         CALL    @PROMPT
 _LCONT
-        XORP    %00000011b, PORTB
+        XORP    %00000011b, PORTB       ; toggle B0 & P1 pins
         JMP     _LOOP
         
 INITMSG
@@ -301,55 +298,30 @@ UARTINIT
         MOVP    %0C0h, SCTL1    ;SCTL1 =C0 11000000   Use Timer3, no prescale bits
         RETS
 
-T2MSBD  EQU     0FFh ; 000h ; 0FFh
-T2LSBD  EQU     0FFh ; 025h ; 0FFh
-T2PSD   EQU     01Fh
-T2CL0D  EQU     10011111b
+        INCLUDE DKmonitor.asm
 
-;;**********************************************************************
-;; INT2INIT 3-41
-;; timer period = clock * (prescalerValue + 1) * (timer value + 1)
-;; 4.9152 MHz / 4 = 307200 Hz -> 8.1380e-07s. 8.1380e-07 * 32 * 65536 = 6.83s
-;; 4.9152 MHz / 4 = 307200 Hz -> 8.1380e-07s. 8.1380e-07 * 32 * 37 = 0.001s
-;;**********************************************************************
-INT2INIT ; Timer 2 Data 3.7, 3-42
-        MOVP    %T2MSBD, T2MDATA ; Load the actual T2MDATA register with initial MSB value
+;INT5    ; Timer/Counter 2 is part of DKmonitor.asm
+;        RETI
+ 
+INT4    ; Serial port
+        BR      RESET
         
-        MOVP    %T2LSBD, T2LDATA ; Load the actual T2LDATA register with initial LSB value
+INT3    ; /INT3 pin 12
+        BR      RESET
         
-        ; Timer Output Function 3.7.9, 3-50
-        MOVP    %01000000b, T2CTL1 ; bit 7=0; no cascade, bit 6=1; B0 toggle, bit 5-0; don't care
-        ; Timer and Prescalar Operation 3.7.7, 3-48
-        MOVP    %10011111b, T2CTL0 ; bit 7=1; reload & start, bit 6=0; internal clock, 
-                                  ; bit 5=0; timer active when idle, bit 4-0; prescaler
-        ; Interrupt Control 3.6.3, 3-32
-        MOVP    %10101110b, IOCNT0 ; bit 7-6=10; Full Expansion mode, 
-                                  ; bit 5-4=10; INT3 cleared & disabled, 
-                                  ; bit 3-2=11; INT2 cleared  & enabled, 
-                                  ; bit 1-0=10; INT1 cleared & disabled
-        MOVP    %00001010b, IOCNT1 ; bit 3-0=1010; INT4 & 5 cleared & disabled
-        MOVP    %00100010b, IOCNT2 ; bit 5-4=10: INT3 edge only, falling edge, 
-                                  ; bit 1-0=10; INT1 edge only, falling edge
-
-        RETS
-
-
-TRAP1
+INT2    ; Timer/Counter 1
         BR      RESET
                 
-TRAP2
-        MOVP    %10011111b, T2CTL0 ; set bit 7; reload & start INT2
-
-        RETI
+INT1    ; /INT1 pin 13
+        BR      RESET
         
-TRAP3
-        BR     RESET
-        
-TRAP4
-        BR     RESET
-               
-        ORG    0FFF6h           ; Set up 5 vectors 
-                                ; =interrupts 
-        DW    TRAP4, TRAP3, TRAP2, TRAP1, RESET 
+        ORG     0FFF4h          ; Set up 6 vectors 
+                                ; =interrupts 3.6 Interrupts and System Reset 3-26
+        DW      INT5
+        DW      INT4
+        DW      INT3
+        DW      INT2
+        DW      INT1
+        DW      RESET 
         
         END
