@@ -10,7 +10,7 @@
 
 VERSMYR EQU     "0"
 VERSMIN EQU     "3"
-VERSPAT EQU     "5"
+VERSPAT EQU     "6"
 
 ; Constants
 HIBITMK EQU     7Fh
@@ -24,7 +24,9 @@ ESC     EQU     01Bh
 ;BREG    EQU     R1
 CREG    EQU     R2
 DREG    EQU     R3
-COUNT1  EQU     R4
+I2REG   EQU     R4
+I5REG   EQU     R5
+COUNT1  EQU     R6
 
 SYSFLGS EQU     R8     ; bit 0 = echo
 OUTBYTE EQU     R9
@@ -89,8 +91,8 @@ RESET   MOV     #SP, B
         MOV     #00h,       DREG
         CALL    @UARTINIT               ; Setup UART for 9600b
         CALL    @INT5INIT
-        EINT
         CALL    @DSPINIT
+        EINT
 
 ;MON_PRMPT_LOOP:
         ; Print monitor prompt
@@ -197,6 +199,11 @@ _MC21
         CALL    @CMD_HXINT
         JMP      _MC99
 _MC23
+        CMP     #'K', A
+        JNZ     _MC24
+        CALL    @CMD_KEYT
+        JMP     _MC99
+_MC24
 
 _MC99
         RETS
@@ -300,8 +307,8 @@ UARTINIT
 
         INCLUDE DKmonitor.asm
 
-;INT5    ; Timer/Counter 2 is part of DKmonitor.asm
-;        RETI
+_INT5    ; Timer/Counter 2 is part of DKmonitor.asm
+        RETI
  
 INT4    ; Serial port
         BR      RESET
@@ -317,11 +324,11 @@ INT1    ; /INT1 pin 13
         
         ORG     0FFF4h          ; Set up 6 vectors 
                                 ; =interrupts 3.6 Interrupts and System Reset 3-26
-        DW      INT5
-        DW      INT4
-        DW      INT3
-        DW      INT2
-        DW      INT1
+        DW      INT5    ; for Timer 2
+        DW      INT4    ; for serial port
+        DW      INT3    ; /INT3 pin
+        DW      INT2    ; for Timer 1
+        DW      INT1    ; /INT1 pin
         DW      RESET 
         
         END

@@ -747,6 +747,10 @@ CMD_TEST
         CALL    @NEWLINE
         RETS
 
-
+CMD_KEYT
+;        CALL    @KEYTEST
+        CALL    @CHKKEY
+        JZ      CMD_KEYT
+        RETS
 
 
