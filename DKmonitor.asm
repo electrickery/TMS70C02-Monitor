@@ -27,6 +27,8 @@ T2MSBD  EQU     000h ; 000h ; 0FFh ; Timer 2 data MSB
 T2LSBD  EQU     025h ; 025h ; 0FFh ; Timer 2 data LSB
 T2PSD   EQU     01Fh ; Timer 2 prescaler
 
+; Iterates over keyboard buffer, converts the key value to a display 
+; pattern, and puts it in the display buffer, fout left-most digits.
 KEYTEST
     CLR     B
 _KTNXT
@@ -39,7 +41,7 @@ _KTNXT
     MOV     A, DSPBUF(B)
     INC     B
     CMP     %KEYRCNT, B ; B - %KEYRCNT, carry set on negative; B: 1, 2, 3, 4
-    JC      _KTNXT
+    JNC      _KTNXT
     RETS
     
 ; Converts the buffered key values (KEYBUF) to hex patterns on the displays (DSPBUF)
@@ -47,52 +49,52 @@ _KTNXT
 ; The input KEYS value is placed in A. The output value, using the lower nibble
 ; recognised patterns: FFh, FEh, FDh, FBh, F7h, EFh, DFh, BFh, 7Fh. Others are multiple keys pressed
 KEY2HEX
-    CMPA    0FFh
+    CMPA    %0FFh
     JNZ      _K2H0
-    MOV     A, 0Fh ; not a value, just no key pressed
+    MOV     %0Fh, A ; not a value, just no key pressed
     JMP     _K2HDN
 _K2H0    
-    CMPA     0FEh
+    CMPA     %0FEh
     JNZ      _K2H1
-    MOV      A, 00h ; Key 0
+    MOV      %00h, A ; Key 0
     JMP     _K2HDN
 _K2H1    
-    CMPA     0FDh
+    CMPA     %0FDh
     JNZ      _K2H2
-    MOV      A, 01h ; Key 1
+    MOV      %01h, A ; Key 1
     JMP     _K2HDN
 _K2H2    
-    CMPA     0FBh
+    CMPA     %0FBh
     JNZ      _K2H3
-    MOV      A, 02h ; Key 2
+    MOV      %02h, A ; Key 2
     JMP     _K2HDN
 _K2H3
-    CMPA     0F7h
+    CMPA     %0F7h
     JNZ      _K2H4
-    MOV      A, 03h ; Key 3
+    MOV      %03h, A ; Key 3
     JMP     _K2HDN
 _K2H4
-    CMPA     0EFh
+    CMPA     %0EFh
     JNZ      _K2H5
-    MOV      A, 04h ; Key 4
+    MOV      %04h, A ; Key 4
     JMP      _K2HDN
 _K2H5
-    CMPA     0DFh
+    CMPA     %0DFh
     JNZ      _K2H6
-    MOV      A, 05h ; Key 5
+    MOV      %05h, A ; Key 5
     JMP      _K2HDN
 _K2H6
-    CMPA     0BFh
+    CMPA     %0BFh
     JNZ      _K2H7
-    MOV      A, 06h ; Key 6
+    MOV      %06h, A ; Key 6
     JMP      _K2HDN
 _K2H7
-    CMPA     07Fh
+    CMPA     %07Fh
     JNZ      _K2HER
-    MOV      A, 07h ; Key 7
+    MOV      %07h, A ; Key 7
     JMP     _K2HDN
 _K2HER
-    MOV     A, 0Eh ; not a valid value, multiple bits clear
+    MOV     %0Eh, A ; not a valid value, multiple bits clear
 
 _K2HDN  ; Done    
     RETS
@@ -164,7 +166,19 @@ _DFLOOP
 
         RETS
         
-IDSPFIL
+;IDSPFIL
+
+DSPCLR
+        CLR     B     
+_DCLOOP
+        MOV     DSPSP, A
+        STA     @DSPBUF(B)
+        INC     B
+        CMP     %DSPBFSZ, B ; B - %DSPBFSZ. Loops for  B = 1, 2, 3, 4, 5, 6
+        JNC     _DCLOOP
+
+        RETS
+
         
         
 _INT2    ; Timer/Counter 1
@@ -239,7 +253,7 @@ _T5NOC ;
         MOVP    B, KEYDSPCOL    ; select the display column
         MOVP    A, DSPPATT      ; place the pattern in LED segment register
         CMP     %KEYRCNT, B     ; check for key row overflow B-%KEYRCNT
-        JNC     _T5KDONE         ; Skip next when all 4 keyboard rows are done
+        JC      _T5KDONE         ; Skip next when all 4 keyboard rows are done
         MOVP    KEYS, A         ; 
         STA     KEYBUF(B)       ; store keys value in keyboard row
 _T5KDONE ; 

@@ -748,9 +748,12 @@ CMD_TEST
         RETS
 
 CMD_KEYT
-;        CALL    @KEYTEST
+        CALL    @DSPCLR
+_CKLOOP
+        CALL    @KEYTEST
         CALL    @CHKKEY
-        JZ      CMD_KEYT
+        JZ      _CKLOOP
+        CALL    @DSPFIL
         RETS
 
 

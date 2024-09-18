@@ -307,8 +307,8 @@ UARTINIT
 
         INCLUDE DKmonitor.asm
 
-_INT5    ; Timer/Counter 2 is part of DKmonitor.asm
-        RETI
+;INT5    ; Timer/Counter 2 is part of DKmonitor.asm
+;        RETI
  
 INT4    ; Serial port
         BR      RESET
