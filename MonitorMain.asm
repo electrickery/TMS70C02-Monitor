@@ -10,7 +10,7 @@
 
 VERSMYR EQU     "0"
 VERSMIN EQU     "3"
-VERSPAT EQU     "6"
+VERSPAT EQU     "7"
 
 ; Constants
 HIBITMK EQU     7Fh
@@ -63,16 +63,20 @@ SP      EQU     0080h   ; R128 and up
 
 ; TRAP0
 RESET   MOV     #SP, B
-        LDSP                            ; Set SP = 0x0080
-        DINT                            ; Disable interrupts
-        MOVP    #00101010b, IOCNT0  ; PO Clear INTI-, INT2, and INT3- flags, 
-                                    ;  disable all INTns (3-32)
+        LDSP                        ; Set SP = 0x0080
+        DINT                        ; Disable interrupts
+                                    ; INT2 = Timer1, INT4 = Serial, INT5 = Timer2
+        MOVP    #00101010b, IOCNT0  ; PO Clear INTI-, INT2, and INT3- flags, disable all INTns (3-32)
+                                    ; bit 7-6: mode, bit 5-4: INT3 clear&disable, 
+                                    ; bit 3-2: INT2 clear & disable, bit 1-0: clear & disable
         MOVP    #00100010b, IOCNT2  ; P1 Select falling edge only for INTI & INT3 
+                                    ; bit 5-4: INT3, bit 1-0: INT1
         MOVP    #00001010b, IOCNT1  ; P2 Clear and disable INT4 and INT5
-        MOVP    %00001000b, PORTA   ; %>0D0, PORTA    ;PORTA=x50    ;LEDs OFF
-        MOVP    %10001110b, DDRA    ; %>0DF, ADDR     ;DDRA=0xDF  
-        MOVP    %008h,      PORTB   ; PORTB=x0f (bit 0-3 only)
-        MOVP    %01010101b, SCTL0   ; reset serial port & error flags
+                                    ; bit 3-2: INT5, bit 1-0: INT4
+        MOVP    #00001000b, PORTA   ; %>0D0, PORTA    ;PORTA=x50    ;LEDs OFF
+        MOVP    #10001110b, DDRA    ; %>0DF, ADDR     ;DDRA=0xDF  
+        MOVP    #008h,      PORTB   ; PORTB=x0f (bit 0-3 only)
+        MOVP    #01010101b, SCTL0   ; reset serial port & error flags
         MOVP    #0FFh,      T1MDATA ; P12 Load Timer 1 MSB reload register 
         MOVP    #0FFh,      T1LDATA ; P13 Load Timer 1 LSB reload register 
         MOVP    #00h,       T1CTL1  ; P14 Disable the timer output on B1 
@@ -90,7 +94,9 @@ RESET   MOV     #SP, B
         MOVD    #00FFh,     ADDR2
         MOV     #00h,       DREG
         CALL    @UARTINIT               ; Setup UART for 9600b
-        CALL    @INT5INIT
+        CALL    @INT2INIT               ; INT2 is used by Timer 1, 
+        CALL    @INT5INIT               ; INT5 is used by Timer 2
+        CALL    @IOCTLINIT
         CALL    @DSPINIT
         EINT
 
@@ -297,7 +303,7 @@ _GNBOECHO
 ;;**********************************************************************
 UARTINIT
         MOVP    %051h, SCTL0    ;SCTL0 = x10 Reset UART 0b01010001
-        MOVP    %7, T3DATA      ;T3DATA= 14 for 4800b,  7 for 9600b (at 4.9152 MHz clock)
+        MOVP    %7, T3DATA      ;T3DATA= 14 for 4800B,  7 for 9600B (at 4.9152 MHz clock)
         ORP     %0F9h, PORTB    ;ENABLE TX Pin   PORTB Bit3=TXD 0b11111001
         ANDP    %0DFh, DDRA     ;PORTA BIT5 = INPUT (RXD)       0b11011111
         MOVP    %01001110b, SMODE ; %>0CE, SMODE    ;SMODE =CE 01001110   1 Stop, No Parity, 8Data, Async
@@ -307,20 +313,20 @@ UARTINIT
 
         INCLUDE DKmonitor.asm
 
-;INT5    ; Timer/Counter 2 is part of DKmonitor.asm
-;        RETI
+;INT5    ; Timer/Counter 2 is part of DKmonitor.asm 
+        RETI
  
 INT4    ; Serial port
-        BR      RESET
+        RETI
         
 INT3    ; /INT3 pin 12
-        BR      RESET
+        RETI
         
-INT2    ; Timer/Counter 1
-        BR      RESET
+;INT2    ; Timer/Counter 1 is part of DKmonitor.asm used for keyboard/display scanning
+        RETI
                 
 INT1    ; /INT1 pin 13
-        BR      RESET
+        RETI
         
         ORG     0FFF4h          ; Set up 6 vectors 
                                 ; =interrupts 3.6 Interrupts and System Reset 3-26

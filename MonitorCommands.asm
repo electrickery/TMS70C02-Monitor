@@ -718,14 +718,10 @@ VPERMSG DB      " -- Incorrect format. Must be 'Vssss eeee nnnn' and ssss < eeee
 ;;**********************************************************************
 CMD_TEST
         CALL    @COLLECT
-;        MOVD    CLBUFP, MSGPTR
-;        CALL    @OUTSTR
         CALL    @NEWLINE
         
         MOV     #0, B
         CALL    @FIRSTADR
-;        CALL    @SECONADR
-;        CALL    @THIRDADR
         MOV     #5, B
         CALL    @GETDATA
         MOV     A, DATA
@@ -738,22 +734,18 @@ CMD_TEST
         
         MOVD    ADDR1, R241
 
-;        CALL    @OUT2NDAD
-;        MOV     #" ", A
-;        CALL    @OUTCHR
-        
-;        CALL    @OUT3RDAD
         CALL    @OUTDATA
         CALL    @NEWLINE
         RETS
 
 CMD_KEYT
         CALL    @DSPCLR
-_CKLOOP
+_CKLOOP                         ; wait loop until char is received
         CALL    @KEYTEST
         CALL    @CHKKEY
+
         JZ      _CKLOOP
-        CALL    @DSPFIL
+        CALL    @DSPFIL         ; restore display buffer
         RETS
 
 
