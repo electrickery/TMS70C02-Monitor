@@ -37,7 +37,7 @@ ADDR2   EQU     R16     ; H=15 L=16  destination / end  address 0Fh-10h
 ADDR3   EQU     R18     ; H=17 L=18  iterating address pointer  11h-12h
 ADDR4   EQU     R20     ; H=19 L=20  iterating destination address 13h-14h  
 DATA    EQU     R21     ; 15h
-
+EREG    EQU     R22
 ; Note buffer must be placed within one page (MSB doesn't change)
 CLBUFPM EQU     R30    ; 001Eh   ; R110 pointer MSB
 CLBUFP  EQU     R31    ; 001Fh   ; R111 command line buffer pointer LSB

@@ -195,38 +195,20 @@ _KP2NLPDONE
         
 _KPN_MOREKEY        
         MOV     %0Eh, A         ; load error code
+        MOV     %10h, B
         JMP     _KPN_DONE
                
 _KPN_NOKEY
         MOV     %0Fh, A         ; load no key code
+        MOV     %10h, B
         
 _KPN_DONE
         RETS
         
 
-; On entry A contains the key bit value (bit 0-2)
-;          B contains the key row = display column (bit 0-1)
-; On exit A contains the key value (000cckkkb)
-KCVMERG
-        RL      B
-        RL      B
-        RL      B
-        AND     %00011100b, B     ; 
-        AND     %00000011b, A
-        OR      B, A
-        RETS
-
-VAL2PAT
-        ; Input value in B (5 bits, key 00-1F), display index in A (0 - 5)
-        PUSH    A
-        LDA     DSPCHR(B)
-        POP     B
-        STA     DSPBUF(B)
-        RETS
-
 ; Test routine
 ; Iterates over keyboard buffer, converts the key value to a display 
-; pattern, and puts it in the display buffer, four left-most digits.
+; pattern (0-7, F), and puts it in the display buffer, four left-most digits.
 ; The interpreted first found key value is displayed on the remaining 
 ; two displays
 KEYTEST
@@ -234,59 +216,43 @@ KEYTEST
 _KTNXT
         LDA     @KEYBUF(B)
         PUSH    B
-        CALL    @KPAT2KNUM      ; Converts this key pattern
-        MOV     A, B
-        LDA     @DSPCHR(B)  
-        POP     B   
-        MOV     A, DSPBUF(B)
-        INC     B
-        CMP     %KEYRCNT, B ; B - %KEYRCNT, carry set on negative; B: 1, 2, 3, 4
-        JNC      _KTNXT
+        CALL    @KPAT2KNUM      ; Converts this key pattern to 0-7, E, F
+        CMP     %08, A          ; A - 8
+        JC      _KTNOKY         ; A > 8 : no key detected
+        POP     B
+        PUSH    B
+        MOV     B, EREG
 
-        MOV     KEYVAL, A
-        CALL    @DISPKV
+_KTNOKY        
+        MOV     A, B            ; to B for conversion & display
+        
+        LDA     @DSPCHR(B)      ; convert to 7-seg pattern
+        POP     B   
+        MOV     A, DSPBUF(B)    ; into display buffer
+
+        INC     B
+        CMP     %KEYRCNT, B     ; B - %KEYRCNT, carry set on negative; B: 1, 2, 3, 4
+        JNC      _KTNXT
+        
+        ; key num into 5th digit, row in 4th
+        PUSH    B
+        MOV     CREG, B
+        ;
+        LDA     @DSPCHR(B)
+        MOV     %5, B
+        STA     DSPBUF(B)
+        ; 
+        MOV     EREG, B
+        LDA     @DSPCHR(B)
+        MOV     %4, B
+        STA     DSPBUF(B)
+
+        POP     B
         
 _KTDONE
         RETS
 
-; On entry A contains the value from KEYVAL.
-; The routine displays this value on the two rightmost display digits.
-; On the value 0FFh, the digits are blank
-DISPKV
-        CMP     %0FFh, A
-        JZ      _DKBLANK
-        PUSH    A
-        BTJZ    %0001000b, A, _DKLSB
-_DLMSBHI
-        MOV     DSP1, A
-        MOV     %04 ,B
-        STA     DSPBUF(B)
-        JMP     _DKLSB
-_DKMSBLOW    
-        MOV     %04 ,B
-        MOV     DSPSP, A
-        STA     DSPBUF(B)        
 
-_DKLSB
-        INC     B
-        POP     A
-        AND     %00001111b, A
-        MOV     A, B
-        LDA     @DSPCHR(B)
-        MOV     A, DSPBUF(B)
-        JMP     _DKDONE
-
-_DKBLANK
-        MOV     %04 ,B
-        MOV     DSPSP, A
-        STA     DSPBUF(B)
-        INC     B
-        STA     DSPBUF(B)
-        
-_DKDONE
-        RETS
-
-;         
 
 
 ; This table doesn't contain patterns, but pointers to the patterns in DSPCHR
