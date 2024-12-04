@@ -234,9 +234,8 @@ _KTNOKY
         CMP     %KEYRCNT, B     ; B - %KEYRCNT, carry set on negative; B: 1, 2, 3, 4
         JNC      _KTNXT
         
-        ; key num into 5th digit, row in 4th
         PUSH    B
-        ; 
+        ; key num into 5th digit, row in 4th
 ;        MOV     EREG, B
 ;        LDA     @DSPCHR(B)
 ;        MOV     %4, B
@@ -284,6 +283,43 @@ KVDISP
         MOV     %5, B
         STA     DSPBUF(B)
 
+        RETS
+
+WAIT4KEY
+        CLR     EREG
+        MOV     EREG, B
+        LDA     KEYBUF(B)
+        CALL    @KPAT2KNUM
+        CMP     %8, A   ; A - 8
+        JNC     _WKFND
+
+        MOV     %1, EREG
+        MOV     EREG, B
+        LDA     KEYBUF(B)
+        CALL    @KPAT2KNUM
+        CMP     %8, A
+        JNC     _WKFND
+
+        MOV     %2, EREG
+        MOV     EREG, B
+        LDA     KEYBUF(B)
+        CALL    @KPAT2KNUM
+        CMP     %8, A
+        JNC     _WKFND
+
+        MOV     %3, EREG
+        MOV     EREG, B
+        LDA     KEYBUF(B)
+        CALL    @KPAT2KNUM
+        CMP     %8, A
+        JNC     _WKFND
+        JMP     WAIT4KEY
+        
+_WKFND
+        MOV     EREG, B
+        CALL    @KVMERGE
+        MOV     B, KEYVAL
+        
         RETS
 
 

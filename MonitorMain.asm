@@ -27,7 +27,7 @@ DREG    EQU     R3
 I2REG   EQU     R4
 I5REG   EQU     R5
 COUNT1  EQU     R6
-
+EREG    EQU     R7
 SYSFLGS EQU     R8     ; bit 0 = echo
 OUTBYTE EQU     R9
 INBYTE  EQU     R10     ;
@@ -37,14 +37,14 @@ ADDR2   EQU     R16     ; H=15 L=16  destination / end  address 0Fh-10h
 ADDR3   EQU     R18     ; H=17 L=18  iterating address pointer  11h-12h
 ADDR4   EQU     R20     ; H=19 L=20  iterating destination address 13h-14h  
 DATA    EQU     R21     ; 15h
-EREG    EQU     R22
+
 ; Note buffer must be placed within one page (MSB doesn't change)
 CLBUFPM EQU     R30    ; 001Eh   ; R110 pointer MSB
 CLBUFP  EQU     R31    ; 001Fh   ; R111 command line buffer pointer LSB
 CLBUF   EQU     R32    ; 0020h   ; R112 - R127   command line buffer
 CLBUFE  EQU     R76    ; 004Ch   ;  command line buffer end
 
-
+; R80-R95 see DKmonitor.asm
 
 SP      EQU     0080h   ; R128 and up
 

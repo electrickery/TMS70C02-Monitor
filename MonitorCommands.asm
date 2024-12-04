@@ -713,29 +713,13 @@ _VP_DONE
 VPERMSG DB      " -- Incorrect format. Must be 'Vssss eeee nnnn' and ssss < eeee.", CR, LF, 0
 
 ;;**********************************************************************
-;; T ? - Test command to check command line to binary conversions
-;;       Not part of the functional set of commands
+;; T ? - Test command 
 ;;**********************************************************************
 CMD_TEST
-        CALL    @COLLECT
-        CALL    @NEWLINE
-        
-        MOV     #0, B
-        CALL    @FIRSTADR
-        MOV     #5, B
-        CALL    @GETDATA
-        MOV     A, DATA
-        
-        CALL    @NEWLINE
-        
-        CALL    @OUT1STAD
-        MOV     #" ", A
-        CALL    @OUTCHR
-        
-        MOVD    ADDR1, R241
-
-        CALL    @OUTDATA
-        CALL    @NEWLINE
+        CALL    @WAIT4KEY
+        MOV     KEYVAL, A
+        CALL    @OUTHEX
+;        CALL    @NEWLINE
         RETS
 
 ;;**********************************************************************
