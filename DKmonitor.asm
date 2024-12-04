@@ -1,5 +1,11 @@
 ; Display/Hex Keyboard monitor TMS70C02
 ;
+;KEYS   is the register for retrieving pressed keys. Usually just one bit is zero.
+;KEYBUF is the buffer containing the KEYS values for all four rows.
+;KEYVAL is a intermediate single byte containing the key row and the key on that row.
+;       it uses bits 0-2 for the key number and bit 3-4 for the row. The value
+;       0FFh is used to indicate no key is pressed. KEYVAL should be debounced.
+
 
 ; ADDRESSES in peripherial file. The 0140h-014Fh region 
 KEYDSPCOL EQU    0140h   ; WR: Keyboard (0-3) & Display (0-5) column counter
@@ -30,91 +36,8 @@ T2MSBD  EQU     000h ; 000h ; 0FFh ; Timer 2 data MSB
 T2LSBD  EQU     025h ; 025h ; 0FFh ; Timer 2 data LSB
 T2PSD   EQU     01Fh ; Timer 2 prescaler
 
-; Test routine
-; Iterates over keyboard buffer, converts the key value to a display 
-; pattern, and puts it in the display buffer, four left-most digits.
-KEYTEST
-    CLR     B
-_KTNXT
-    LDA     @KEYBUF(B)
-    PUSH    B
-    CALL    @KEY2HEX
-    MOV     A, B
-    LDA     @DSPCHR(B)  
-    POP     B   
-    MOV     A, DSPBUF(B)
-    INC     B
-    CMP     %KEYRCNT, B ; B - %KEYRCNT, carry set on negative; B: 1, 2, 3, 4
-    JNC      _KTNXT
-
-    RETS
     
-KEY2NUM
-        DB      0FFh, 00Fh ; not a value, just no key pressed
-        DB      0FEh, 000h ; Key 0
-        DB      0FDh, 001h ; Key 1
-        DB      0FBh, 002h ; Key 2
-        DB      0F7h, 003h ; Key 3
-        DB      0EFh, 004h ; Key 4
-        DB      0DFh, 005h ; Key 5
-        DB      0BFh, 006h ; Key 6
-        DB      07Fh, 007h ; Key 7
-        DB      000h, 00Eh ; not a valid value, multiple bits clear
-        
-; Converts the buffered key values (KEYBUF) to hex patterns on the displays (DSPBUF)
-; A pressed key changes one bit in a byte, the eight valid values fit on a single digit.
-; The input KEYS value is placed in A. The output value, using the lower nibble
-; recognised patterns: FFh, FEh, FDh, FBh, F7h, EFh, DFh, BFh, 7Fh. Others are multiple keys pressed
-KEY2HEX
-    CMPA    %0FFh
-    JNZ      _K2H0
-    MOV     %0Fh, A ; not a value, just no key pressed
-    JMP     _K2HDN
-_K2H0    
-    CMPA     %0FEh
-    JNZ      _K2H1
-    MOV      %00h, A ; Key 0
-    JMP     _K2HDN
-_K2H1    
-    CMPA     %0FDh
-    JNZ      _K2H2
-    MOV      %01h, A ; Key 1
-    JMP     _K2HDN
-_K2H2    
-    CMPA     %0FBh
-    JNZ      _K2H3
-    MOV      %02h, A ; Key 2
-    JMP     _K2HDN
-_K2H3
-    CMPA     %0F7h
-    JNZ      _K2H4
-    MOV      %03h, A ; Key 3
-    JMP     _K2HDN
-_K2H4
-    CMPA     %0EFh
-    JNZ      _K2H5
-    MOV      %04h, A ; Key 4
-    JMP      _K2HDN
-_K2H5
-    CMPA     %0DFh
-    JNZ      _K2H6
-    MOV      %05h, A ; Key 5
-    JMP      _K2HDN
-_K2H6
-    CMPA     %0BFh
-    JNZ      _K2H7
-    MOV      %06h, A ; Key 6
-    JMP      _K2HDN
-_K2H7
-    CMPA     %07Fh
-    JNZ      _K2HER
-    MOV      %07h, A ; Key 7
-    JMP     _K2HDN
-_K2HER
-    MOV     %0Eh, A ; not a valid value, multiple bits clear
 
-_K2HDN  ; Done    
-    RETS
 
 ;;**********************************************************************
 ;; INT5INIT 3-41  - configures both INT2 and INT5
@@ -213,7 +136,9 @@ INT2    ; INT 2 / Timer/Counter 1 ; INT2
                 
 INT5    ; INT 5 / Timer/Counter 2 is used for keyboard/display scanning
 ; 
-; Display routine, lights one hex digit per interrupt cycle
+; Display routine, lights one hex digit from DSPBUF per interrupt cycle. 
+; For the first four displays the corresponding key patterns is read and 
+; placed in the KEYBUF buffer.
         PUSH    A
         PUSH    B
         ; Clear pattern buffer, preventing bleeding
@@ -239,32 +164,58 @@ _T5KDONE ;
         POP     B
         POP     A
         RETI    ; INT5 end
-        
-        
-KEYS2KEY        ; Input: column in B. Key pattern in A. Output: KEYVAL
-        PUSH    B       ; save column
-        MOV     #7, B
-_K2K1   ; Loop through the bits, sending them to the C-flag
-        RLC     A
-        JC      _K2KFND ; a set carry bit means the key was pressed
+
+
+; On entry A contains the key pattern.
+; On exit A contains a value; 0Fh for no key, 00h-07H for one key, 0Eh for
+; multiple keys
+KPAT2KNUM
+        MOV     %9, B           ; off-by-one to ensure all 8 bits are checked
+        MOV     %0, DREG        ; set initial found key count
+
+_KP2NLOOP
         DEC     B
-        JNZ     _K2K1
-        MOV     %0FFh, A  ; flags no key found
-        JMP     _K2KDN
-_K2KFND ; Key found
-        POP     A       ; get column
-        RL      A
-        RL      A
-        OR      %0F8h, A
-        AND     B, A
-        MOV     A, KEYVAL       ; KEYVAL is the combination of the key bit 
-                                ; (extracted from KEYBUF)
-                                ; and keyboard column (KEYDSPCOL) 
-                                ; bits 0-2 are the key, bits 3-4 the column
+        JZ      _KP2NLPDONE     ; stop loop when all bits done
+        RLC     A
+        JC      _KP2NLOOP       ; jump on a 1, no key pressed
+        INC     DREG            ; Count the number of keys found
+        MOV     B, CREG         ; Keep the found keys here
+        DEC     CREG            ; correct the checked bit number
+        JMP     _KP2NLOOP
+
+_KP2NLPDONE
+        CMP     %0h, DREG       ; check for no keys
+        JZ      _KPN_NOKEY      ; 
         
-_K2KDN  ; KEYS2KEY done
-;        RETS
+        CMP     %1h, DREG       ; check for one key
+        JNZ      _KPN_MOREKEY   ; if more, jump to error
         
+        MOV     CREG, A         ; load last found key
+        JMP     _KPN_DONE
+        
+_KPN_MOREKEY        
+        MOV     %0Eh, A         ; load error code
+        JMP     _KPN_DONE
+               
+_KPN_NOKEY
+        MOV     %0Fh, A         ; load no key code
+        
+_KPN_DONE
+        RETS
+        
+
+; On entry A contains the key bit value (bit 0-2)
+;          B contains the key row = display column (bit 0-1)
+; On exit A contains the key value (000cckkkb)
+KCVMERG
+        RL      B
+        RL      B
+        RL      B
+        AND     %00011100b, B     ; 
+        AND     %00000011b, A
+        OR      B, A
+        RETS
+
 VAL2PAT
         ; Input value in B (5 bits, key 00-1F), display index in A (0 - 5)
         PUSH    A
@@ -272,6 +223,70 @@ VAL2PAT
         POP     B
         STA     DSPBUF(B)
         RETS
+
+; Test routine
+; Iterates over keyboard buffer, converts the key value to a display 
+; pattern, and puts it in the display buffer, four left-most digits.
+; The interpreted first found key value is displayed on the remaining 
+; two displays
+KEYTEST
+        CLR     B
+_KTNXT
+        LDA     @KEYBUF(B)
+        PUSH    B
+        CALL    @KPAT2KNUM      ; Converts this key pattern
+        MOV     A, B
+        LDA     @DSPCHR(B)  
+        POP     B   
+        MOV     A, DSPBUF(B)
+        INC     B
+        CMP     %KEYRCNT, B ; B - %KEYRCNT, carry set on negative; B: 1, 2, 3, 4
+        JNC      _KTNXT
+
+        MOV     KEYVAL, A
+        CALL    @DISPKV
+        
+_KTDONE
+        RETS
+
+; On entry A contains the value from KEYVAL.
+; The routine displays this value on the two rightmost display digits.
+; On the value 0FFh, the digits are blank
+DISPKV
+        CMP     %0FFh, A
+        JZ      _DKBLANK
+        PUSH    A
+        BTJZ    %0001000b, A, _DKLSB
+_DLMSBHI
+        MOV     DSP1, A
+        MOV     %04 ,B
+        STA     DSPBUF(B)
+        JMP     _DKLSB
+_DKMSBLOW    
+        MOV     %04 ,B
+        MOV     DSPSP, A
+        STA     DSPBUF(B)        
+
+_DKLSB
+        INC     B
+        POP     A
+        AND     %00001111b, A
+        MOV     A, B
+        LDA     @DSPCHR(B)
+        MOV     A, DSPBUF(B)
+        JMP     _DKDONE
+
+_DKBLANK
+        MOV     %04 ,B
+        MOV     DSPSP, A
+        STA     DSPBUF(B)
+        INC     B
+        STA     DSPBUF(B)
+        
+_DKDONE
+        RETS
+
+;         
 
 
 ; This table doesn't contain patterns, but pointers to the patterns in DSPCHR
@@ -291,7 +306,7 @@ DSPMSG   DB      16h,  07h,  00h,  0Ch,  00h,  02h,  0FFh ; short version
 ;               .gfedcba
 DSPCHR
 DSP0    DB      00111111b ; 0      3Fh
-        DB      00000110b ; 1      06h
+DSP1    DB      00000110b ; 1      06h
 DSP2    DB      01011011b ; 2      5bh
         DB      01001111b ; 3      4Fh
         DB      01100110b ; 4      66h
