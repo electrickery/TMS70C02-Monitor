@@ -236,23 +236,55 @@ _KTNOKY
         
         ; key num into 5th digit, row in 4th
         PUSH    B
-        MOV     CREG, B
-        ;
-        LDA     @DSPCHR(B)
-        MOV     %5, B
-        STA     DSPBUF(B)
         ; 
+;        MOV     EREG, B
+;        LDA     @DSPCHR(B)
+;        MOV     %4, B
+;        STA     DSPBUF(B)
+        ;
+;        MOV     CREG, B
+;        LDA     @DSPCHR(B)
+;        MOV     %5, B
+;        STA     DSPBUF(B)
+        ;
+        MOV     CREG, A
         MOV     EREG, B
-        LDA     @DSPCHR(B)
-        MOV     %4, B
-        STA     DSPBUF(B)
+        CALL    @KVMERGE
+        CALL    @KVDISP
 
         POP     B
         
 _KTDONE
         RETS
 
+; Merge key row & bit number into key value
+; On entry: A = bit number (bits 0-2) bbb
+;           B = row number (bits 0-1) rr
+; On exit: B = key value, 000rrbbb
+KVMERGE
+        RLC     B
+        RLC     B
+        RLC     B
+        AND     %00011000b, B
+        AND     %00000111b, A
+        OR      A, B
+        RETS
 
+; On entry: B = key value: 000rrbbb     
+KVDISP
+        PUSH    B
+        SWAP    B
+        AND     %00001111b, B
+        LDA     @DSPCHR(B)
+        MOV     %4, B
+        STA     DSPBUF(B)
+        POP     B
+        AND     %00001111b, B
+        LDA     @DSPCHR(B)
+        MOV     %5, B
+        STA     DSPBUF(B)
+
+        RETS
 
 
 ; This table doesn't contain patterns, but pointers to the patterns in DSPCHR
